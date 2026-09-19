@@ -12,6 +12,7 @@ import { createFileStore } from "../src/storage/fileStore.js";
 import { buildServer } from "../src/mcp/server.js";
 import { createHttpApp, type HttpDeps } from "../src/server/http.js";
 import { createScanWorker } from "../src/scan/worker.js";
+import { scanCompleteMessage } from "../src/domain/scans.js";
 import { copy } from "../src/domain/copy.js";
 import type { Extractor } from "../src/domain/scanPipeline.js";
 import type { Item } from "../src/domain/model.js";
@@ -26,11 +27,10 @@ function statusNotify(
   return (id) => {
     void (async () => {
       try {
-        const scan = await store.getScan(id);
-        app.locals.notifyAll(scan?.status === "ready" ? copy.scanReady : copy.scanFailed);
+        app.locals.notifyAll(scanCompleteMessage(await store.getScan(id)));
       } catch (err) {
         console.error(`[wayfinder] scan ${id} status lookup failed:`, err);
-        app.locals.notifyAll(copy.scanFailed);
+        app.locals.notifyAll(scanCompleteMessage(null));
       }
     })();
   };
@@ -209,6 +209,44 @@ describe("POST /api/agent", () => {
     const health = await fetch(`${base}/healthz`);
     expect(health.status).toBe(200);
     expect(await health.json()).toEqual({ ok: true });
+
+    await new Promise<void>((resolve) => { httpServer.close(() => resolve()); });
+  });
+
+  it("returns the agent result including its brain tag", async () => {
+    const app = createHttpApp({
+      store: createFileStore(mkdtempSync(join(tmpdir(), "wf-agent-ok-"))),
+      agent: {
+        brainName: "rules",
+        async handle() {
+          return { reply: "Nothing needs your attention today.", toolCalls: [], brain: "rules" as const };
+        }
+      }
+    });
+    const { httpServer, base } = await listenHttp(app);
+
+    const ok = await fetch(`${base}/api/agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ utterance: "what's due today?" })
+    });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ reply: "Nothing needs your attention today.", toolCalls: [], brain: "rules" });
+
+    await new Promise<void>((resolve) => { httpServer.close(() => resolve()); });
+  });
+
+  it("rejects an empty utterance with 400", async () => {
+    const app = createHttpApp({ store: createFileStore(mkdtempSync(join(tmpdir(), "wf-agent-empty-"))) });
+    const { httpServer, base } = await listenHttp(app);
+
+    const empty = await fetch(`${base}/api/agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ utterance: "   " })
+    });
+    expect(empty.status).toBe(400);
+    expect(await empty.json()).toEqual({ error: "utterance required" });
 
     await new Promise<void>((resolve) => { httpServer.close(() => resolve()); });
   });

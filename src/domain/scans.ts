@@ -7,6 +7,11 @@ import { extractFields } from "./extractors.js";
 import { redactSensitive } from "./redact.js";
 import { scoreScam } from "./scam.js";
 import { planActions } from "./actionPlanner.js";
+import { copy } from "./copy.js";
+
+export function scanCompleteMessage(scan: Scan | null): string {
+  return scan?.status === "ready" ? copy.scanReady : copy.scanFailed;
+}
 
 export async function createScan(store: Store, input: { imageRefs: string[]; hint: Scan["hint"] }): Promise<Scan> {
   const scan: Scan = {
