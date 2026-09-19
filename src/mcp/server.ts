@@ -5,6 +5,8 @@ import { runScan, type Extractor } from "../domain/scanPipeline.js";
 import { copy } from "../domain/copy.js";
 import { rememberObject, findObject } from "../domain/objectMemory.js";
 import { applyAction } from "../domain/applyAction.js";
+import { parseLabel } from "../domain/labelParser.js";
+import { redactSensitive } from "../domain/redact.js";
 
 export function buildServer(deps: { store: Store; extract?: Extractor }): McpServer {
   const server = new McpServer({ name: "wayfinder", version: "0.1.0" });
@@ -43,8 +45,11 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     { scanId: z.string() },
     async ({ scanId }) => {
       const items = (await deps.store.listItems("all")).filter((i) => i.scanId === scanId);
+      const spoken = items
+        .map((i) => (i.class === "label" ? `${i.readAloudText} ${copy.disclaimers.label}` : i.readAloudText))
+        .join(" ");
       return {
-        content: [{ type: "text", text: items.map((i) => i.readAloudText).join(" ") || copy.nothingFound }],
+        content: [{ type: "text", text: spoken || copy.nothingFound }],
         structuredContent: { items }
       };
     }
@@ -91,6 +96,94 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
           isError: true
         };
       }
+    }
+  );
+
+  server.tool(
+    "list_items",
+    "List the customer's items, optionally filtered to unresolved, due, or flagged.",
+    { filter: z.enum(["unresolved", "due", "flagged", "all"]).default("unresolved") },
+    async ({ filter }) => {
+      const items = await deps.store.listItems(filter);
+      return {
+        content: [{ type: "text", text: items.length ? `${items.length} item(s).` : copy.nothingFound }],
+        structuredContent: { items }
+      };
+    }
+  );
+
+  server.tool(
+    "get_item",
+    "Return one item's full detail and read-aloud text.",
+    { itemId: z.string() },
+    async ({ itemId }) => {
+      const item = await deps.store.getItem(itemId);
+      if (!item) {
+        return { content: [{ type: "text", text: copy.nothingFound }], isError: true };
+      }
+      const text = item.class === "label" ? `${item.readAloudText} ${copy.disclaimers.label}` : item.readAloudText;
+      return { content: [{ type: "text", text }], structuredContent: { item } };
+    }
+  );
+
+  server.tool(
+    "update_preferences",
+    "Update the customer's preferences such as verbosity or trusted contact.",
+    {
+      verbosity: z.enum(["brief", "normal", "detailed"]).optional(),
+      trustedContactAlias: z.string().nullable().optional(),
+      largeText: z.boolean().optional()
+    },
+    async (patch) => {
+      const current = await deps.store.getPreferences();
+      const updated = { ...current, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) };
+      await deps.store.putPreferences(updated);
+      return { content: [{ type: "text", text: "Preferences saved." }], structuredContent: { preferences: updated } };
+    }
+  );
+
+  server.tool(
+    "identify_product",
+    "Read a product, food, or medication label back to the customer, verbatim.",
+    { imageRefs: z.array(z.string()).min(1) },
+    async ({ imageRefs }) => {
+      if (!deps.extract) {
+        return { content: [{ type: "text", text: copy.readerUnavailable }], structuredContent: { available: false } };
+      }
+      let texts: string[];
+      try {
+        texts = await deps.extract(imageRefs, "label");
+      } catch (err) {
+        console.error("[identify_product] extractor failed:", err);
+        texts = [];
+      }
+      const labelText = redactSensitive(texts.join(" ").trim());
+      if (!labelText) {
+        return { content: [{ type: "text", text: copy.nothingFound }], structuredContent: { available: true } };
+      }
+      const parsed = parseLabel(labelText);
+      return {
+        content: [{ type: "text", text: `${parsed.name}. ${parsed.disclaimer}` }],
+        structuredContent: parsed
+      };
+    }
+  );
+
+  server.tool(
+    "daily_briefing",
+    "Give the customer a summary of what is due, upcoming, or flagged.",
+    {},
+    async () => {
+      const [due, flagged, objects] = await Promise.all([
+        deps.store.listItems("due"),
+        deps.store.listItems("flagged"),
+        deps.store.listObjects()
+      ]);
+      const summary =
+        due.length + flagged.length + objects.length > 0
+          ? `You have ${due.length} due, ${flagged.length} flagged.`
+          : "Nothing needs your attention today.";
+      return { content: [{ type: "text", text: summary }], structuredContent: { due, flagged, objects } };
     }
   );
 

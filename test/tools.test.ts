@@ -29,3 +29,26 @@ describe("capture_scan without an extractor", () => {
     await client.close();
   });
 });
+
+describe("label disclaimer", () => {
+  it("appends the disclaimer when reading a label item", async () => {
+    const { client, store } = await connect();
+    await store.putItem({
+      itemId: "itm_lab", scanId: "scn_x", class: "label", confidence: 0.9,
+      readAloudText: "Ibuprofen 400mg", fields: {}, proposedActions: [],
+      createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null
+    });
+    const res = await client.callTool({ name: "get_item", arguments: { itemId: "itm_lab" } });
+    expect(JSON.stringify(res.content)).toContain(copy.disclaimers.label);
+    await client.close();
+  });
+});
+
+describe("update_preferences", () => {
+  it("merges a patch into preferences", async () => {
+    const { client, store } = await connect();
+    await client.callTool({ name: "update_preferences", arguments: { verbosity: "brief" } });
+    expect((await store.getPreferences()).verbosity).toBe("brief");
+    await client.close();
+  });
+});
