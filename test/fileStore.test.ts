@@ -114,4 +114,34 @@ describe("resilience", () => {
     const all = await store.listItems("all");
     expect(all.map((i) => i.itemId)).toContain("itm_ok");
   });
+
+  it("skips a parseable-but-invalid {} item file for every filter", async () => {
+    await store.putItem(mkItem({ itemId: "itm_ok" }));
+    mkdirSync(join(dir, "items"), { recursive: true });
+    writeFileSync(join(dir, "items", "itm_empty.json"), "{}", "utf8");
+    expect((await store.listItems("all")).map((i) => i.itemId)).toEqual(["itm_ok"]);
+    expect((await store.listItems("unresolved")).map((i) => i.itemId)).toEqual(["itm_ok"]);
+    expect(await store.listItems("due")).toEqual([]);
+    expect(await store.listItems("flagged")).toEqual([]);
+  });
+
+  it("skips parseable-but-invalid action entries", async () => {
+    await store.putItem(mkItem({ itemId: "itm_a" }));
+    await store.putAction(mkAction({ itemId: "itm_a" }));
+    writeFileSync(join(dir, "actions", "itm_a.json"), "[{}, {\"type\":\"flag\"}]", "utf8");
+    expect(await store.listActions("itm_a")).toEqual([]);
+    await expect(store.listItems("flagged")).resolves.toBeTruthy();
+  });
+
+  it("skips a parseable-but-invalid object file", async () => {
+    writeFileSync(join(dir, "object-bad.json"), "{}", "utf8");
+    expect(await store.listObjects()).toEqual([]);
+  });
+
+  it("falls back to default preferences when the stored file is invalid", async () => {
+    writeFileSync(join(dir, "preferences.json"), JSON.stringify({ verbosity: "loud" }), "utf8");
+    const prefs = await store.getPreferences();
+    expect(prefs.verbosity).toBe("normal");
+    expect(prefs.largeText).toBe(false);
+  });
 });
