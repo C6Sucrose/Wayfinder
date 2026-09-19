@@ -31,6 +31,10 @@ export function planActions(item: Item, scam?: ScamResult): Action[] {
     case "receipt":
       out.push(make(item.itemId, "file"));
       break;
+    default: {
+      const unhandled: never = item.class;
+      throw new Error(`Unhandled document class: ${String(unhandled)}`);
+    }
   }
   return out;
 }

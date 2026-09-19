@@ -35,6 +35,30 @@ describe("amount normalization", () => {
   it("parses comma-thousands without a decimal", () => {
     expect(extractFields("Amount due: $1,234", "bill").amount).toEqual({ value: 1234, currency: "USD" });
   });
+
+  it("parses an ungrouped 4-digit integer with a decimal", () => {
+    expect(extractFields("Amount due: $1234.56", "bill").amount).toEqual({ value: 1234.56, currency: "USD" });
+  });
+
+  it("parses an ungrouped 4-digit integer without a decimal", () => {
+    expect(extractFields("Amount due: $1000", "bill").amount).toEqual({ value: 1000, currency: "USD" });
+  });
+
+  it("parses a space-grouped GBP amount", () => {
+    expect(extractFields("Amount due: £4 999.00", "bill").amount).toEqual({ value: 4999, currency: "GBP" });
+  });
+
+  it("derives currency from the matched symbol in mixed-currency text", () => {
+    expect(extractFields("You may pay €10.00, or in dollars $20.00.", "bill").amount).toEqual({ value: 10, currency: "EUR" });
+  });
+});
+
+describe("reference redaction", () => {
+  it("masks an IBAN embedded inside a reference value", () => {
+    const f = extractFields("Reference INV-DE89370400440532013000", "bill");
+    expect(f.reference).toBe("INV-••••3000");
+    expect(JSON.stringify(f)).not.toContain("DE89370400440532013000");
+  });
 });
 
 describe("account masking safety", () => {

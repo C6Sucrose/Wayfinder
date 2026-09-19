@@ -1,23 +1,17 @@
 import type { DocClass, Fields } from "./model.js";
+import { maskAccount, redactSensitive } from "./redact.js";
+
+export { maskAccount } from "./redact.js";
 
 const MONTHS: Record<string, string> = {
   january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
   july: "07", august: "08", september: "09", october: "10", november: "11", december: "12"
 };
 
-export function maskAccount(raw: string): string {
-  const clean = raw.replace(/\s+/g, "");
-  if (clean.length < 5) {
-    return clean.length > 2 ? `••••${clean.slice(-2)}` : "••••";
-  }
-  return `••••${clean.slice(-4)}`;
-}
-
-const IBAN_SHAPE = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{10,}$/;
-
 function normalizeAmount(raw: string): number {
-  const decimal = raw.match(/[.,](\d{2})$/);
-  const integerPart = (decimal ? raw.slice(0, raw.length - 3) : raw).replace(/[.,]/g, "");
+  const cleaned = raw.replace(/\s+/g, "");
+  const decimal = cleaned.match(/[.,](\d{2})$/);
+  const integerPart = (decimal ? cleaned.slice(0, cleaned.length - 3) : cleaned).replace(/[.,]/g, "");
   return Number(decimal ? `${integerPart}.${decimal[1]}` : integerPart);
 }
 
@@ -38,12 +32,10 @@ function time24(text: string): string | undefined {
 }
 
 function amount(text: string): Fields["amount"] {
-  const sym = text.match(/[€$£]\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/);
-  if (sym) {
-    const currency = text.includes("€") ? "EUR" : text.includes("£") ? "GBP" : "USD";
-    return { value: normalizeAmount(sym[1]!), currency };
-  }
-  return undefined;
+  const m = text.match(/([€$£])\s?((?:\d{1,3}(?:[.,\s]\d{3})+|\d+)(?:[.,]\d{2})?)/);
+  if (!m) return undefined;
+  const currency = m[1] === "€" ? "EUR" : m[1] === "£" ? "GBP" : "USD";
+  return { value: normalizeAmount(m[2]!), currency };
 }
 
 export function extractFields(text: string, cls: DocClass): Fields {
@@ -60,8 +52,7 @@ export function extractFields(text: string, cls: DocClass): Fields {
   if (iban) fields.maskedAccount = maskAccount(iban[0]);
   const ref = text.match(/\b(?:reference|kundennummer|customer no\.?|ref)\s*[:#]?\s*([A-Z0-9-]{4,})/i);
   if (ref) {
-    const value = ref[1]!;
-    fields.reference = IBAN_SHAPE.test(value) ? maskAccount(value) : value;
+    fields.reference = redactSensitive(ref[1]!);
   }
   return fields;
 }

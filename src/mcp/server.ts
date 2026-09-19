@@ -1,11 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Store } from "../storage/types.js";
-import { runScan } from "../domain/scanPipeline.js";
+import { runScan, type Extractor } from "../domain/scanPipeline.js";
 import { copy } from "../domain/copy.js";
 import { rememberObject, findObject } from "../domain/objectMemory.js";
 
-export function buildServer(deps: { store: Store }): McpServer {
+export function buildServer(deps: { store: Store; extract?: Extractor }): McpServer {
   const server = new McpServer({ name: "wayfinder", version: "0.1.0" });
 
   server.tool(
@@ -13,7 +13,15 @@ export function buildServer(deps: { store: Store }): McpServer {
     "Start reading images the customer captured. Use for mail, labels, or objects.",
     { imageRefs: z.array(z.string()).min(1), hint: z.enum(["mail", "label", "object", "scene", "auto"]).default("auto") },
     async ({ imageRefs, hint }) => {
-      const scan = await runScan(deps.store, { imageRefs, hint });
+      const extract: Extractor = deps.extract ?? (async () => []);
+      let extractedText: string[];
+      try {
+        extractedText = await extract(imageRefs, hint);
+      } catch (err) {
+        console.error("[capture_scan] extractor failed:", err);
+        extractedText = [];
+      }
+      const scan = await runScan(deps.store, { imageRefs, hint, extractedText });
       const items = await deps.store.listItems("all");
       const mine = items.filter((i) => i.scanId === scan.scanId);
       return {
