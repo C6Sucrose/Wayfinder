@@ -44,7 +44,7 @@ export function renderScreen(input: ScreenInput): string {
       const due = Array.isArray(result.due) ? result.due.length : 0;
       const flagged = Array.isArray(result.flagged) ? result.flagged.length : 0;
       const appts = Array.isArray(result.appointments) ? result.appointments.length : 0;
-      return `<section class="grid">${card("Due", `<p class="big">${due}</p>`)}${card("Appointments", `<p class="big">${appts}</p>`)}${card("Flagged", `<p class="big">${flagged}</p>`, flagged ? " alert" : "")}</section>`;
+      return `<section class="grid">${card("Due", `<p class="big">${due}</p>`)}${card("Appointments", `<p class="big">${appts}</p>`)}${card("Flagged", `<p class="big">${flagged}</p>`, flagged ? "alert" : "")}</section>`;
     }
     case "identify_product":
       return card(escape(result.name ?? "Label"), `<pre class="label">${escape(result.labelText ?? "")}</pre><p class="disclaimer">${escape(result.disclaimer ?? "")}</p>`);
