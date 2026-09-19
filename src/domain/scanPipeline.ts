@@ -22,28 +22,34 @@ export async function runScan(store: Store, input: ScanInput): Promise<Scan> {
   await store.putScan(scan);
 
   const texts = input.extractedText ?? [];
-  for (const text of texts) {
-    const signals = {
-      hasQrOrLink: /https?:\/\/|\bQR\b/i.test(text),
-      hasPaymentRequest: /pay|payment|transfer|überweisen/i.test(text),
-      senderMismatch: /dear customer/i.test(text)
-    };
-    const { class: cls, confidence } = classifyText(text, signals);
-    const fields = extractFields(text, cls);
-    const scam = scoreScam(text, signals);
-    const itemId = `itm_${randomUUID().slice(0, 8)}`;
-    const actions = planActions(
-      { itemId, scanId, class: cls, confidence, readAloudText: text, fields, proposedActions: [], createdAt: new Date().toISOString(), resolvedAt: null },
-      scam
-    );
-    const item = ItemSchema.parse({
-      itemId, scanId, class: cls, confidence, readAloudText: text,
-      fields, proposedActions: actions, createdAt: new Date().toISOString(), resolvedAt: null
-    });
-    await store.putItem(item);
+  let status: Scan["status"] = texts.length > 0 ? "ready" : "failed";
+  try {
+    for (const text of texts) {
+      const signals = {
+        hasQrOrLink: /https?:\/\/|\bQR\b/i.test(text),
+        hasPaymentRequest: /pay|payment|transfer|überweisen/i.test(text),
+        senderMismatch: /dear customer/i.test(text)
+      };
+      const { class: cls, confidence } = classifyText(text, signals);
+      const fields = extractFields(text, cls);
+      const scam = scoreScam(text, signals);
+      const itemId = `itm_${randomUUID().slice(0, 8)}`;
+      const createdAt = new Date().toISOString();
+      const actions = planActions(
+        { itemId, scanId, class: cls, confidence, readAloudText: text, fields, proposedActions: [], createdAt, resolvedAt: null },
+        scam
+      );
+      const item = ItemSchema.parse({
+        itemId, scanId, class: cls, confidence, readAloudText: text,
+        fields, proposedActions: actions, createdAt, resolvedAt: null
+      });
+      await store.putItem(item);
+    }
+  } catch {
+    status = "failed";
   }
 
-  const done: Scan = { ...scan, status: texts.length > 0 ? "ready" : "failed" };
+  const done: Scan = { ...scan, status };
   await store.putScan(done);
   return done;
 }
