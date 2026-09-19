@@ -4,7 +4,7 @@ import { createScanWorker } from "../scan/worker.js";
 import { createBedrockExtractor } from "../scan/bedrockExtractor.js";
 import { createMcpExecutor, type McpClientLike } from "../agent/mcpExecutor.js";
 import { createAgentService } from "../agent/service.js";
-import { copy } from "../domain/copy.js";
+import { scanCompleteMessage } from "../domain/scans.js";
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -31,11 +31,10 @@ const worker = createScanWorker({
   onComplete: (id) => {
     void (async () => {
       try {
-        const scan = await store.getScan(id);
-        app.locals.notifyAll(scan?.status === "ready" ? copy.scanReady : copy.scanFailed);
+        app.locals.notifyAll(scanCompleteMessage(await store.getScan(id)));
       } catch (err) {
         console.error(`[wayfinder] scan ${id} status lookup failed:`, err);
-        app.locals.notifyAll(copy.scanFailed);
+        app.locals.notifyAll(scanCompleteMessage(null));
       }
     })();
   },

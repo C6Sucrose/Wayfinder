@@ -59,3 +59,19 @@ describe("/mcp origin enforcement", () => {
     expect(res.status).not.toBe(403);
   });
 });
+
+describe("/api/agent origin enforcement", () => {
+  it("rejects a disallowed Origin with 403 before the body is handled", async () => {
+    const res = await fetch(`${base}/api/agent`, {
+      method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" }, body: JSON.stringify({ utterance: "{not json" })
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ jsonrpc: "2.0", error: { code: -32000, message: "Forbidden: origin not allowed" }, id: null });
+  });
+  it("does not block a request that omits Origin", async () => {
+    const res = await fetch(`${base}/api/agent`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ utterance: "what's due?" })
+    });
+    expect(res.status).not.toBe(403);
+  });
+});

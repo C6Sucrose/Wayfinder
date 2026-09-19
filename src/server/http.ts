@@ -39,7 +39,7 @@ export function createHttpApp(deps: HttpDeps) {
   // Enforce Origin before body parsing so a disallowed origin gets 403 even when
   // its body is malformed or oversized.
   app.use((req, res, next) => {
-    if (req.path.startsWith("/mcp") && !isAllowedOrigin(req.headers.origin, allowed)) {
+    if ((req.path.startsWith("/mcp") || req.path.startsWith("/api/agent")) && !isAllowedOrigin(req.headers.origin, allowed)) {
       res.status(403).json({ jsonrpc: "2.0", error: { code: -32000, message: "Forbidden: origin not allowed" }, id: null });
       return;
     }
