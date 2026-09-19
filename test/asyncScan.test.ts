@@ -19,6 +19,51 @@ import type { Item } from "../src/domain/model.js";
 const textOf = (res: unknown) =>
   ((res as { content?: Array<{ text?: string }> }).content ?? []).map((c) => c.text ?? "").join(" ");
 
+function statusNotify(
+  app: ReturnType<typeof createHttpApp>,
+  store: ReturnType<typeof createFileStore>
+): (id: string) => void {
+  return (id) => {
+    void (async () => {
+      try {
+        const scan = await store.getScan(id);
+        app.locals.notifyAll(scan?.status === "ready" ? copy.scanReady : copy.scanFailed);
+      } catch (err) {
+        console.error(`[wayfinder] scan ${id} status lookup failed:`, err);
+        app.locals.notifyAll(copy.scanFailed);
+      }
+    })();
+  };
+}
+
+async function listenHttp(app: ReturnType<typeof createHttpApp>): Promise<{ httpServer: Server; base: string }> {
+  const httpServer: Server = app.listen(0);
+  await new Promise<void>((resolve) => { httpServer.once("listening", () => resolve()); });
+  const addr = httpServer.address();
+  return { httpServer, base: `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}` };
+}
+
+async function connectSse(mcpUrl: URL): Promise<{ client: Client; firstPush: Promise<string> }> {
+  const client = new Client({ name: "test", version: "0.0.1" });
+  let sseReady!: () => void;
+  const sseOpened = new Promise<void>((resolve) => { sseReady = resolve; });
+  const transport = new StreamableHTTPClientTransport(mcpUrl, {
+    fetch: async (url, init) => {
+      const response = await fetch(url, init);
+      if (init?.method === "GET" && response.ok) sseReady();
+      return response;
+    }
+  });
+  await client.connect(transport as unknown as Transport);
+  await sseOpened;
+  const firstPush = new Promise<string>((resolve) => {
+    client.setNotificationHandler(LoggingMessageNotificationSchema, (n) => {
+      resolve(String(n.params.data ?? ""));
+    });
+  });
+  return { client, firstPush };
+}
+
 async function connect(extract?: Extractor) {
   const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-async-")));
   const worker = createScanWorker(extract ? { store, extract } : { store });
@@ -80,7 +125,7 @@ describe("scan completion push", () => {
     const extract: Extractor = async () => ["Amount due: €84.20. Payment due 2026-10-01."];
     const deps: HttpDeps = { store, extract };
     const app = createHttpApp(deps);
-    const worker = createScanWorker({ store, extract, onComplete: () => app.locals.notifyAll(copy.scanReady) });
+    const worker = createScanWorker({ store, extract, onComplete: statusNotify(app, store) });
     deps.worker = worker;
 
     const httpServer: Server = app.listen(0);
@@ -113,6 +158,58 @@ describe("scan completion push", () => {
 
     await client.close();
     await worker.close();
+    await new Promise<void>((resolve) => { httpServer.close(() => resolve()); });
+  });
+
+  it("pushes the failure message, not the ready message, when the extractor fails", async () => {
+    const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-push-fail-")));
+    const extract: Extractor = async () => { throw new Error("bedrock unavailable"); };
+    const deps: HttpDeps = { store, extract };
+    const app = createHttpApp(deps);
+    const worker = createScanWorker({ store, extract, onComplete: statusNotify(app, store) });
+    deps.worker = worker;
+
+    const { httpServer, base } = await listenHttp(app);
+    const { client, firstPush } = await connectSse(new URL(`${base}/mcp`));
+
+    const captured = await client.callTool({ name: "capture_scan", arguments: { imageRefs: ["img"], hint: "mail" } });
+    const sc = captured.structuredContent as { scanId: string; status?: string };
+    expect(sc.status).toBe("queued");
+    await worker.idle();
+    await expect(firstPush).resolves.toBe(copy.scanFailed);
+
+    const got = await client.callTool({ name: "get_scan", arguments: { scanId: sc.scanId } });
+    expect(textOf(got)).toBe(copy.scanFailed);
+
+    await client.close();
+    await worker.close();
+    await new Promise<void>((resolve) => { httpServer.close(() => resolve()); });
+  });
+});
+
+describe("POST /api/agent", () => {
+  it("responds 502 when the agent rejects and keeps serving subsequent requests", async () => {
+    const app = createHttpApp({
+      store: createFileStore(mkdtempSync(join(tmpdir(), "wf-agent-"))),
+      agent: {
+        brainName: "rules",
+        async handle() { throw new Error("bedrock down"); }
+      }
+    });
+    const { httpServer, base } = await listenHttp(app);
+
+    const failed = await fetch(`${base}/api/agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ utterance: "what's due?" })
+    });
+    expect(failed.status).toBe(502);
+    expect(await failed.json()).toEqual({ error: copy.toolFailed });
+
+    const health = await fetch(`${base}/healthz`);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ ok: true });
+
     await new Promise<void>((resolve) => { httpServer.close(() => resolve()); });
   });
 });

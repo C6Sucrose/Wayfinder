@@ -8,6 +8,7 @@ import type { Extractor } from "../domain/scanPipeline.js";
 import type { ScanWorker } from "../scan/worker.js";
 import type { AgentService } from "../agent/service.js";
 import { buildServer } from "../mcp/server.js";
+import { copy } from "../domain/copy.js";
 
 export function isAllowedOrigin(origin: string | undefined, extra: string[]): boolean {
   if (origin === undefined || origin === "") return true; // non-browser clients omit Origin
@@ -56,8 +57,12 @@ export function createHttpApp(deps: HttpDeps) {
     const utterance = typeof req.body?.utterance === "string" ? req.body.utterance : "";
     if (!utterance.trim()) { res.status(400).json({ error: "utterance required" }); return; }
     if (!deps.agent) { res.status(503).json({ error: "agent unavailable" }); return; }
-    const result = await deps.agent.handle(utterance);
-    res.json(result);
+    try {
+      res.json(await deps.agent.handle(utterance));
+    } catch (err) {
+      console.error("[api/agent] agent failed:", err);
+      res.status(502).json({ error: copy.toolFailed });
+    }
   });
 
   const handle = async (req: express.Request, res: express.Response) => {
