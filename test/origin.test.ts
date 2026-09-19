@@ -33,6 +33,8 @@ describe("isAllowedOrigin", () => {
 describe("resolveHost", () => {
   it("defaults to loopback and honors HOST", () => {
     expect(resolveHost({})).toBe("127.0.0.1");
+    expect(resolveHost({ HOST: "" })).toBe("127.0.0.1");
+    expect(resolveHost({ HOST: "   " })).toBe("127.0.0.1");
     expect(resolveHost({ HOST: "0.0.0.0" })).toBe("0.0.0.0");
   });
 });

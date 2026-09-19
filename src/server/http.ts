@@ -12,12 +12,12 @@ export function isAllowedOrigin(origin: string | undefined, extra: string[]): bo
   let url: URL;
   try { url = new URL(origin); } catch { return false; }
   const host = url.hostname;
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") return true;
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return true;
   return extra.includes(origin);
 }
 
 export function resolveHost(env: NodeJS.ProcessEnv = process.env): string {
-  return env.HOST ?? "127.0.0.1";
+  return env.HOST?.trim() || "127.0.0.1";
 }
 
 export function createHttpApp(deps: { store: Store; extract?: Extractor; allowedOrigins?: string[] }) {
