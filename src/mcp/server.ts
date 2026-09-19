@@ -1,7 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Store } from "../storage/types.js";
-import { runScan, type Extractor } from "../domain/scanPipeline.js";
+import type { Extractor } from "../domain/scanPipeline.js";
+import { createScan } from "../domain/scans.js";
+import type { ScanWorker } from "../scan/worker.js";
 import { copy } from "../domain/copy.js";
 import { rememberObject, findObject } from "../domain/objectMemory.js";
 import { applyAction } from "../domain/applyAction.js";
@@ -9,8 +11,14 @@ import { parseLabel } from "../domain/labelParser.js";
 import { redactSensitive } from "../domain/redact.js";
 import type { Item } from "../domain/model.js";
 
-export function buildServer(deps: { store: Store; extract?: Extractor }): McpServer {
-  const server = new McpServer({ name: "wayfinder", version: "0.1.0" });
+export interface ServerDeps {
+  store: Store;
+  extract?: Extractor;
+  worker?: ScanWorker;
+}
+
+export function buildServer(deps: ServerDeps): McpServer {
+  const server = new McpServer({ name: "wayfinder", version: "0.1.0" }, { capabilities: { logging: {} } });
 
   const safeError = (tool: string, err: unknown, message: string = copy.toolUnavailable) => {
     console.error(`[${tool}] failed:`, err);
@@ -25,25 +33,17 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Start reading images the customer captured. Use for mail, labels, or objects.",
     { imageRefs: z.array(z.string()).min(1), hint: z.enum(["mail", "label", "object", "scene", "auto"]).default("auto") },
     async ({ imageRefs, hint }) => {
-      if (!deps.extract) {
+      if (!deps.extract || !deps.worker) {
         return {
           content: [{ type: "text", text: copy.readerUnavailable }],
           structuredContent: { available: false, count: 0 }
         };
       }
-      let extractedText: string[];
-      try {
-        extractedText = await deps.extract(imageRefs, hint);
-      } catch (err) {
-        console.error("[capture_scan] extractor failed:", err);
-        extractedText = [];
-      }
-      const scan = await runScan(deps.store, { imageRefs, hint, extractedText });
-      const items = await deps.store.listItems("all");
-      const mine = items.filter((i) => i.scanId === scan.scanId);
+      const scan = await createScan(deps.store, { imageRefs, hint });
+      deps.worker.enqueue({ scanId: scan.scanId, imageRefs, hint });
       return {
-        content: [{ type: "text", text: mine.length ? copy.scanRead(mine.length) : copy.scanFailed }],
-        structuredContent: { scanId: scan.scanId, count: mine.length, available: true }
+        content: [{ type: "text", text: copy.scanStarted }],
+        structuredContent: { scanId: scan.scanId, status: "queued", available: true }
       };
     }
   );
@@ -53,18 +53,34 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Return the items found in a previous scan, with their suggested actions.",
     { scanId: z.string() },
     async ({ scanId }) => {
+      const scan = await deps.store.getScan(scanId);
+      if (!scan) {
+        return { content: [{ type: "text", text: copy.nothingFound }], isError: true };
+      }
       let items: Item[];
       try {
         items = (await deps.store.listItems("all")).filter((i) => i.scanId === scanId);
       } catch (err) {
         return safeError("get_scan", err);
       }
+      if (scan.status === "queued" || scan.status === "analyzing") {
+        return {
+          content: [{ type: "text", text: copy.scanQueued }],
+          structuredContent: { scanId, status: scan.status, items: [] }
+        };
+      }
+      if (scan.status === "failed") {
+        return {
+          content: [{ type: "text", text: copy.scanFailed }],
+          structuredContent: { scanId, status: "failed", items: [] }
+        };
+      }
       const spoken = items
         .map((i) => (i.class === "label" ? `${i.readAloudText} ${copy.disclaimers.label}` : i.readAloudText))
         .join(" ");
       return {
         content: [{ type: "text", text: spoken || copy.nothingFound }],
-        structuredContent: { items }
+        structuredContent: { scanId, status: scan.status, items }
       };
     }
   );
