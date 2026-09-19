@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wayfinder — Alexa+ simulation</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <section class="device" aria-label="Simulated Alexa+ device">
+        <header class="device__bar"><span class="device__title">Wayfinder</span><span id="brain" class="badge" aria-live="polite">rules</span></header>
+        <div id="screen" class="device__screen"></div>
+        <div class="device__controls">
+          <button id="talk" type="button" aria-pressed="false">Hold to talk</button>
+          <form id="type-form"><label class="sr-only" for="utterance">Type a request</label><input id="utterance" autocomplete="off" placeholder="Type a request…" /><button type="submit">Send</button></form>
+        </div>
+      </section>
+      <aside class="panel">
+        <h2>Transcript</h2><ol id="transcript" aria-live="polite"></ol>
+        <h2>Events</h2><pre id="events" aria-live="polite"></pre>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
