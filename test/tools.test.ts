@@ -7,6 +7,12 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createFileStore } from "../src/storage/fileStore.js";
 import { buildServer } from "../src/mcp/server.js";
 import { copy } from "../src/domain/copy.js";
+import type { Item } from "../src/domain/model.js";
+
+const item = (over: Partial<Item> = {}): Item => ({
+  itemId: "itm_x", scanId: "scn_x", class: "personal", confidence: 0.7, readAloudText: "hello",
+  fields: {}, proposedActions: [], createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null, ...over
+});
 
 async function connect(extract?: Parameters<typeof buildServer>[0]["extract"]) {
   const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-")));
@@ -33,13 +39,72 @@ describe("capture_scan without an extractor", () => {
 describe("label disclaimer", () => {
   it("appends the disclaimer when reading a label item", async () => {
     const { client, store } = await connect();
-    await store.putItem({
-      itemId: "itm_lab", scanId: "scn_x", class: "label", confidence: 0.9,
-      readAloudText: "Ibuprofen 400mg", fields: {}, proposedActions: [],
-      createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null
-    });
+    await store.putItem(item({
+      itemId: "itm_lab", class: "label", confidence: 0.9, readAloudText: "Ibuprofen 400mg"
+    }));
     const res = await client.callTool({ name: "get_item", arguments: { itemId: "itm_lab" } });
     expect(JSON.stringify(res.content)).toContain(copy.disclaimers.label);
+    await client.close();
+  });
+});
+
+describe("get_item error safety", () => {
+  it("does not leak internal error text for an unsafe id", async () => {
+    const { client } = await connect();
+    const res = await client.callTool({ name: "get_item", arguments: { itemId: "../../etc/passwd" } });
+    expect(res.isError).toBe(true);
+    const text = (res.content as Array<{ text: string }>).map((c) => c.text).join(" ");
+    expect(text).not.toContain("Invalid id");
+    expect(text).not.toMatch(/itm_/);
+    expect(text).not.toMatch(/[\\/]/);
+    await client.close();
+  });
+});
+
+describe("daily_briefing", () => {
+  it("returns every category and counts them truthfully", async () => {
+    const { client, store } = await connect();
+    await store.putItem(item({ itemId: "itm_due", fields: { dueDate: "2026-09-01" } }));
+    await store.putItem(item({ itemId: "itm_appt", class: "appointment", fields: { appointmentAt: "2026-09-25T09:00:00.000Z" } }));
+    await store.putItem(item({ itemId: "itm_scam", class: "scam" }));
+    await store.putObject({ objectId: "obj_k", name: "keys", locationNote: "entry table", lastSeenAt: "2026-09-19T10:00:00.000Z" });
+
+    const res = await client.callTool({ name: "daily_briefing", arguments: { date: "2026-09-19" } });
+    const sc = res.structuredContent as { due: Item[]; appointments: Item[]; flagged: Item[]; objectReminders: unknown[] };
+    expect(sc.due.map((i) => i.itemId)).toEqual(["itm_due"]);
+    expect(sc.appointments.map((i) => i.itemId)).toEqual(["itm_appt"]);
+    expect(sc.flagged.map((i) => i.itemId)).toContain("itm_scam");
+    expect(sc.objectReminders).toHaveLength(1);
+
+    const text = (res.content as Array<{ text: string }>)[0]!.text;
+    expect(text).toContain("1 due");
+    expect(text).toContain("1 appointment(s)");
+    expect(text).toContain("1 flagged");
+    expect(text).toContain("1 reminder(s)");
+    await client.close();
+  });
+
+  it("uses the supplied date as the due reference", async () => {
+    const { client, store } = await connect();
+    await store.putItem(item({ itemId: "itm_later", fields: { dueDate: "2026-09-20" } }));
+
+    const before = await client.callTool({ name: "daily_briefing", arguments: { date: "2026-09-19" } });
+    expect((before.structuredContent as { due: Item[] }).due).toHaveLength(0);
+
+    const on = await client.callTool({ name: "daily_briefing", arguments: { date: "2026-09-20" } });
+    expect((on.structuredContent as { due: Item[] }).due.map((i) => i.itemId)).toEqual(["itm_later"]);
+    await client.close();
+  });
+
+  it("is sensible when only object reminders exist", async () => {
+    const { client, store } = await connect();
+    await store.putObject({ objectId: "obj_k", name: "keys", locationNote: "entry table", lastSeenAt: "2026-09-19T10:00:00.000Z" });
+
+    const res = await client.callTool({ name: "daily_briefing", arguments: { date: "2026-09-19" } });
+    const text = (res.content as Array<{ text: string }>)[0]!.text;
+    expect(text).toContain("1 reminder(s)");
+    expect(text).not.toContain("0 due");
+    expect(text).not.toContain("0 flagged");
     await client.close();
   });
 });
