@@ -4,7 +4,7 @@ import { scoreScam } from "../src/domain/scam.js";
 describe("scoreScam", () => {
   it("returns high risk for a gift-card payment demand", () => {
     const r = scoreScam("Urgent: pay with gift cards within 24 hours.", {
-      hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true
+      hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true, genericSalutation: false
     });
     expect(r.band).toBe("high");
     expect(r.reasons.length).toBeGreaterThanOrEqual(2);
@@ -12,21 +12,35 @@ describe("scoreScam", () => {
 
   it("returns low risk for normal mail", () => {
     const r = scoreScam("Your appointment is confirmed.", {
-      hasQrOrLink: false, hasPaymentRequest: false, senderMismatch: false
+      hasQrOrLink: false, hasPaymentRequest: false, senderMismatch: false, genericSalutation: false
     });
     expect(r.band).toBe("low");
   });
 
   it("keeps an ordinary payment-due bill out of the high band", () => {
     const r = scoreScam("Payment due by 1 October 2026. Final notice.", {
-      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false, genericSalutation: false
     });
     expect(r.band).not.toBe("high");
     expect(r.riskScore).toBeLessThan(0.35);
   });
 
   it("rounds the risk score to two decimals", () => {
-    const r = scoreScam("Pay now.", { hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true });
+    const r = scoreScam("Pay now.", { hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true, genericSalutation: false });
     expect(r.riskScore).toBe(0.7);
+  });
+
+  it("raises a generic-greeting phishing mail out of the low band", () => {
+    const r = scoreScam("Dear customer, urgent: pay now", {
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false, genericSalutation: true
+    });
+    expect(r.band).not.toBe("low");
+  });
+
+  it("keeps a normal bill with a generic greeting in the low band", () => {
+    const r = scoreScam("Dear customer, payment due 2026-10-01.", {
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false, genericSalutation: true
+    });
+    expect(r.band).toBe("low");
   });
 });

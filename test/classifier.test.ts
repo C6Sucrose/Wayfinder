@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { classifyText, type Signals } from "../src/domain/classifier.js";
 
-const noSignals: Signals = { hasQrOrLink: false, hasPaymentRequest: false, senderMismatch: false };
+const noSignals: Signals = { hasQrOrLink: false, hasPaymentRequest: false, senderMismatch: false, genericSalutation: false };
 
 describe("classifyText", () => {
   it("classifies a bill", () => {
@@ -22,7 +22,7 @@ describe("classifyText", () => {
 
   it("flags scam when strong signals are present", () => {
     const r = classifyText("Urgent: pay immediately with gift cards to avoid arrest.", {
-      hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true
+      hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true, genericSalutation: false
     });
     expect(r.class).toBe("scam");
     expect(r.reasons.length).toBeGreaterThan(0);
@@ -35,14 +35,14 @@ describe("classifyText", () => {
 
   it("keeps a legitimate final-notice bill classified as a bill", () => {
     const r = classifyText("Amount due: €84.20. Payment due 1 October 2026. Final notice.", {
-      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false, genericSalutation: false
     });
     expect(r.class).toBe("bill");
   });
 
   it("flags a gift-card demand corroborated by urgency and sender mismatch", () => {
     const r = classifyText("Urgent: pay with gift cards to release your parcel.", {
-      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: true
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: true, genericSalutation: false
     });
     expect(r.class).toBe("scam");
   });
@@ -50,5 +50,27 @@ describe("classifyText", () => {
   it("does not match words that merely contain rule substrings", () => {
     expect(classifyText("Take a taxi to the office.", noSignals).class).not.toBe("government");
     expect(classifyText("Please determine the outcome.", noSignals).class).not.toBe("appointment");
+  });
+});
+
+const base: Signals = { hasQrOrLink: false, hasPaymentRequest: false, senderMismatch: false, genericSalutation: false };
+
+describe("generic salutation handling", () => {
+  it("does not treat a normal bill with a generic greeting as a scam", () => {
+    const r = classifyText("Dear customer, payment due on 2026-10-01.", { ...base, hasPaymentRequest: true, genericSalutation: true });
+    expect(r.class).toBe("bill");
+  });
+  it("still flags a corroborated phishing letter", () => {
+    const r = classifyText("Dear customer, urgent: pay now https://evil.example", {
+      ...base, hasPaymentRequest: true, genericSalutation: true, hasQrOrLink: true
+    });
+    expect(r.class).toBe("scam");
+  });
+  it("reports a truthful reason for a generic greeting", () => {
+    const r = classifyText("Dear customer, urgent: pay now https://evil.example", {
+      ...base, hasPaymentRequest: true, genericSalutation: true, hasQrOrLink: true
+    });
+    expect(r.reasons.join(" ")).not.toMatch(/does not match the claimed organisation/);
+    expect(r.reasons.join(" ")).toMatch(/generic greeting/);
   });
 });
