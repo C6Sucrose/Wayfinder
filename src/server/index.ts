@@ -28,7 +28,17 @@ const app = createHttpApp(deps);
 
 const worker = createScanWorker({
   store,
-  onComplete: () => app.locals.notifyAll(copy.scanReady),
+  onComplete: (id) => {
+    void (async () => {
+      try {
+        const scan = await store.getScan(id);
+        app.locals.notifyAll(scan?.status === "ready" ? copy.scanReady : copy.scanFailed);
+      } catch (err) {
+        console.error(`[wayfinder] scan ${id} status lookup failed:`, err);
+        app.locals.notifyAll(copy.scanFailed);
+      }
+    })();
+  },
   ...(extract ? { extract } : {})
 });
 deps.worker = worker;
