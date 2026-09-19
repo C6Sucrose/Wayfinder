@@ -43,6 +43,21 @@ describe("redactSensitive grouped formats", () => {
   });
 });
 
+describe("redactSensitive alphanumeric IBAN groups", () => {
+  it("masks a grouped IBAN whose groups contain letters", () => {
+    const out = redactSensitive("IBAN GB29 NWBK 6016 1331 9268 19");
+    expect(out).not.toContain("GB29");
+    expect(out).not.toContain("NWBK");
+    expect(out).toContain("••••6819");
+  });
+  it("masks a lowercase grouped IBAN whose groups contain letters", () => {
+    const out = redactSensitive("iban gb29 nwbk 6016 1331 9268 19");
+    expect(out).not.toContain("gb29");
+    expect(out).not.toContain("nwbk");
+    expect(out).toContain("••••6819");
+  });
+});
+
 describe("redactSensitive irregular separators", () => {
   it("masks a multi-space grouped card number", () => {
     expect(redactSensitive("card 4111  1111  1111  1111")).toBe("card ••••1111");
