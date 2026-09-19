@@ -52,6 +52,28 @@ document.getElementById("type-form")!.addEventListener("submit", (e) => {
   void send(value);
 });
 
+// Demo menu: quick-pick utterances, a client-local Reset, and a large-text toggle.
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-utterance]")) {
+  button.addEventListener("click", () => void send(button.dataset.utterance ?? ""));
+}
+
+const largeText = document.getElementById("large-text") as HTMLButtonElement;
+function setLargeText(on: boolean): void {
+  if (on) document.body.setAttribute("data-large-text", "");
+  else document.body.removeAttribute("data-large-text");
+  largeText.setAttribute("aria-pressed", String(on));
+}
+largeText.addEventListener("click", () => setLargeText(largeText.getAttribute("aria-pressed") !== "true"));
+
+const resetButton = document.getElementById("reset") as HTMLButtonElement;
+resetButton.addEventListener("click", () => {
+  transcript.replaceChildren();
+  events.textContent = "";
+  brain.textContent = "rules";
+  screen.replaceChildren();
+  utterance.value = "";
+});
+
 // Push-to-talk using the Web Speech API where available.
 const SpeechRecognitionCtor = (window as unknown as { SpeechRecognition?: new () => never; webkitSpeechRecognition?: new () => never }).SpeechRecognition
   ?? (window as unknown as { webkitSpeechRecognition?: new () => never }).webkitSpeechRecognition;

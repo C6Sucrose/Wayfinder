@@ -37,6 +37,14 @@ body {
   line-height: 1.5;
 }
 
+body[data-large-text] {
+  font-size: 22px;
+}
+
+html:has(body[data-large-text]) {
+  font-size: 125%;
+}
+
 .stage {
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(320px, 520px);
@@ -106,6 +114,29 @@ body {
 .device__controls form {
   display: flex;
   gap: 10px;
+}
+
+.demo-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  padding: 0 16px;
+  font-size: 0.95rem;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chip--quiet {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--ink);
 }
 
 button,
