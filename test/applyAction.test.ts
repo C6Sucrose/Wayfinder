@@ -44,6 +44,16 @@ describe("applyAction", () => {
     expect(r.action.status).toBe("done");
   });
 
+  it("heals a stale action store when the item already mirrors the action as done", async () => {
+    await store.putItem(item({
+      proposedActions: [{ actionId: "itm_a:file", itemId: "itm_a", type: "file", params: {}, status: "done" }]
+    }));
+    await store.putAction({ actionId: "itm_a:file", itemId: "itm_a", type: "file", params: {}, status: "proposed" });
+    const r = await applyAction(store, "itm_a", "itm_a:file");
+    expect(r.action.status).toBe("done");
+    expect((await store.listActions("itm_a"))[0]!.status).toBe("done");
+  });
+
   it("refuses share without a trusted contact", async () => {
     await store.putItem(item({
       proposedActions: [{ actionId: "itm_a:share", itemId: "itm_a", type: "share", params: {}, status: "proposed" }]
@@ -84,6 +94,10 @@ describe("act_on_item tool", () => {
     await s.putItem(item());
     const res = await client.callTool({ name: "act_on_item", arguments: { itemId: "itm_a", actionId: "itm_a:nope" } });
     expect(res.isError).toBe(true);
+    const text = (res.content as Array<{ text: string }>)[0]!.text;
+    expect(text).toBe("I couldn't do that — please choose the action again.");
+    expect(text).not.toMatch(/itm_|act_|scn_/);
+    expect(text).not.toMatch(/[{}[\]]/);
     await client.close();
   });
 });

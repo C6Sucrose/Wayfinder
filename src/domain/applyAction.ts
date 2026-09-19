@@ -14,6 +14,7 @@ export async function applyAction(store: Store, itemId: string, actionId: string
   if (!action) throw new Error("Unknown action.");
 
   if (action.status === "done" || action.status === "confirmed") {
+    await store.putAction(action);
     return { item, action, message: "That's already done." };
   }
 
