@@ -57,6 +57,32 @@ describe("get_item error safety", () => {
     expect(text).not.toContain("Invalid id");
     expect(text).not.toMatch(/itm_/);
     expect(text).not.toMatch(/[\\/]/);
+    expect(text).toContain(copy.toolUnavailable);
+    expect(text).not.toContain(copy.toolFailed);
+    await client.close();
+  });
+});
+
+describe("act_on_item error copy", () => {
+  it("keeps the action-specific message", async () => {
+    const { client } = await connect();
+    const res = await client.callTool({ name: "act_on_item", arguments: { itemId: "../../etc/passwd", actionId: "x" } });
+    expect(res.isError).toBe(true);
+    const text = (res.content as Array<{ text: string }>).map((c) => c.text).join(" ");
+    expect(text).toContain(copy.toolFailed);
+    await client.close();
+  });
+});
+
+describe("identify_product read-back", () => {
+  it("speaks the full label text including detail lines, then the disclaimer", async () => {
+    const extract = async () => ["Ibuprofen 400mg\nBest before 2028-01\nContains lactose"];
+    const { client } = await connect(extract);
+    const res = await client.callTool({ name: "identify_product", arguments: { imageRefs: ["x"] } });
+    const text = (res.content as Array<{ text: string }>)[0]!.text;
+    expect(text).toContain("Best before");
+    expect(text).toContain("Contains lactose");
+    expect(text).toContain(copy.disclaimers.label);
     await client.close();
   });
 });
@@ -93,6 +119,17 @@ describe("daily_briefing", () => {
 
     const on = await client.callTool({ name: "daily_briefing", arguments: { date: "2026-09-20" } });
     expect((on.structuredContent as { due: Item[] }).due.map((i) => i.itemId)).toEqual(["itm_later"]);
+    await client.close();
+  });
+
+  it("rejects a non-ISO date with a safe customer message", async () => {
+    const { client } = await connect();
+    const res = await client.callTool({ name: "daily_briefing", arguments: { date: "tomorrow" } });
+    expect(res.isError).toBe(true);
+    const text = (res.content as Array<{ text: string }>)[0]!.text;
+    expect(text).toBe(copy.invalidDate);
+    expect(text).not.toMatch(/itm_|scn_|https?:|[{}]/);
+    expect(res.structuredContent).toBeUndefined();
     await client.close();
   });
 
@@ -138,6 +175,7 @@ describe("resources and prompt", () => {
     expect(prompts.prompts.map((p) => p.name)).toContain("morning_briefing");
     const got = await client.getPrompt({ name: "morning_briefing" });
     expect(got.messages.length).toBeGreaterThan(0);
+    expect(JSON.stringify(got.messages)).toContain(copy.prompts.morningBriefing);
     await client.close();
   });
 });
