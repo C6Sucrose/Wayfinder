@@ -5,7 +5,9 @@
 **Primary track:** Alexa+ · **Mini challenges:** AWS Builder, Open Source
 **Submission deadline:** 2026-10-23
 **Spec date:** 2026-09-19
-**Status:** Approved for implementation planning
+**Status:** SUPERSEDED — concept pivoted to Wayfinder (`2026-09-19-wayfinder-design.md`)
+
+> **SUPERSEDED:** This spec describes the original "home accessibility/safety services" concept. After a viability/attractiveness review it was replaced by the Wayfinder spec (blind/low-vision copilot). Kept for history only. Nothing in this document is authoritative.
 
 > Name note: "HearthRail" returned no meaningful web/trademark hits in the sanity check; it is a working name pending a formal clearance. The previous candidates "Threshold" (Target brand) and "SteadyHome" were rejected/not chosen. Renaming is a find-and-replace because all user-facing strings live in one place.
 
