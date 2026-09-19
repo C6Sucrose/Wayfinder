@@ -23,9 +23,18 @@ export async function createScan(store: Store, input: { imageRefs: string[]; hin
 export async function processScan(store: Store, scanId: string, texts: string[]): Promise<Scan> {
   const scan = await store.getScan(scanId);
   if (!scan) throw new Error("Unknown scan.");
+  // Already terminal: return as-is so an at-least-once retry cannot duplicate items.
+  if (scan.status === "ready" || scan.status === "failed") return scan;
 
   const analyzing: Scan = { ...scan, status: "analyzing" };
   await store.putScan(analyzing);
+
+  // A queued/analyzing scan may be retried after a partial attempt. Drop items
+  // from any earlier attempt so the re-run converges instead of accumulating.
+  const stale = (await store.listItems("all")).filter((i) => i.scanId === scanId);
+  for (const item of stale) {
+    try { await store.deleteItem(item.itemId); } catch (e) { console.error(`[scans] cleanup of ${item.itemId} failed:`, e); }
+  }
 
   const items: Item[] = [];
   try {

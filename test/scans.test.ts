@@ -27,7 +27,7 @@ describe("processScan", () => {
     expect(items[0]!.class).toBe("bill");
   });
 
-  it("marks the scan failed and persists nothing when a text cannot be processed", async () => {
+  it("marks the scan failed and rolls back when persisting an item fails", async () => {
     const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
     const real = store;
     const flaky = {
@@ -39,9 +39,46 @@ describe("processScan", () => {
     expect((await real.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(0);
   });
 
+  it("marks the scan failed without items when analysis throws", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const done = await processScan(store, scan.scanId, [null as unknown as string]);
+    expect(done.status).toBe("failed");
+    expect((await store.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(0);
+  });
+
   it("marks a scan failed when given no text", async () => {
     const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
     const done = await processScan(store, scan.scanId, []);
     expect(done.status).toBe("failed");
+  });
+
+  it("is idempotent when re-invoked on a ready scan", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const texts = ["Amount due: €10. Payment due 2026-10-01."];
+    const first = await processScan(store, scan.scanId, texts);
+    expect(first.status).toBe("ready");
+    const second = await processScan(store, scan.scanId, texts);
+    expect(second.status).toBe("ready");
+    expect(second).toEqual(first);
+    expect((await store.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(1);
+  });
+
+  it("returns an already-failed scan unchanged and writes no items", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const failed = await processScan(store, scan.scanId, []);
+    expect(failed.status).toBe("failed");
+    const again = await processScan(store, scan.scanId, ["Amount due: €10. Payment due 2026-10-01."]);
+    expect(again).toEqual(failed);
+    expect((await store.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(0);
+  });
+
+  it("replaces stale items from a prior attempt instead of duplicating them", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const texts = ["Amount due: €10. Payment due 2026-10-01."];
+    await processScan(store, scan.scanId, texts);
+    await store.putScan({ ...scan, status: "analyzing" });
+    const retried = await processScan(store, scan.scanId, texts);
+    expect(retried.status).toBe("ready");
+    expect((await store.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(1);
   });
 });
