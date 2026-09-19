@@ -19,7 +19,7 @@ function itemCard(item: Record<string, unknown>): string {
   const due = item.fields && typeof item.fields === "object" && "dueDate" in (item.fields as object)
     ? escape((item.fields as Record<string, unknown>).dueDate)
     : "";
-  const tone = cls === "scam" ? " alert" : cls === "label" ? " info" : "";
+  const tone = cls === "scam" ? "alert" : cls === "label" ? "info" : "";
   const actions = Array.isArray(item.proposedActions)
     ? `<ul class="actions">${(item.proposedActions as Array<Record<string, unknown>>)
         .map((a) => `<li>${escape(a.type)}</li>`)

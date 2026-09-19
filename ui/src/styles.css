@@ -4,6 +4,7 @@
   --wf-muted: var(--mcp-color-text-secondary, #555555);
   --wf-accent: var(--mcp-color-accent, #0a5bd3);
   --wf-alert-bg: #fff3f2; --wf-alert-fg: #8a1f11;
+  --wf-info-bg: #eff6ff; --wf-info-fg: #1e40af;
   --wf-radius: 12px; --wf-gap: 12px;
 }
 * { box-sizing: border-box; }
@@ -12,6 +13,7 @@ body { margin: 0; background: var(--wf-bg); color: var(--wf-fg); font: 16px/1.5 
 .card { border: 1px solid color-mix(in srgb, var(--wf-fg) 15%, transparent); border-radius: var(--wf-radius); padding: 16px; }
 .card h2 { margin: 0 0 8px; font-size: 1rem; text-transform: capitalize; }
 .card--alert { background: var(--wf-alert-bg); color: var(--wf-alert-fg); }
+.card--info { background: var(--wf-info-bg); color: var(--wf-info-fg); }
 .big { font-size: 2rem; margin: 0; }
 .actions { margin: 8px 0 0; padding-left: 20px; }
 .label { white-space: pre-wrap; font-family: inherit; }
