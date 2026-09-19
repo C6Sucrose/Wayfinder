@@ -17,7 +17,7 @@ function itemCard(item: Record<string, unknown>): string {
   const cls = String(item.class ?? "item");
   const text = escape(item.readAloudText ?? "");
   const due = item.fields && typeof item.fields === "object" && "dueDate" in (item.fields as object)
-    ? escape((item.fields as Record<string, unknown>).dueDate)
+    ? (item.fields as Record<string, unknown>).dueDate
     : "";
   const tone = cls === "scam" ? "alert" : cls === "label" ? "info" : "";
   const actions = Array.isArray(item.proposedActions)
@@ -47,11 +47,11 @@ export function renderScreen(input: ScreenInput): string {
       return `<section class="grid">${card("Due", `<p class="big">${due}</p>`)}${card("Appointments", `<p class="big">${appts}</p>`)}${card("Flagged", `<p class="big">${flagged}</p>`, flagged ? "alert" : "")}</section>`;
     }
     case "identify_product":
-      return card(escape(result.name ?? "Label"), `<pre class="label">${escape(result.labelText ?? "")}</pre><p class="disclaimer">${escape(result.disclaimer ?? "")}</p>`);
+      return card(String(result.name ?? "Label"), `<pre class="label">${escape(result.labelText ?? "")}</pre><p class="disclaimer">${escape(result.disclaimer ?? "")}</p>`);
     case "find_object": {
       const found = result.found as Record<string, unknown> | null | undefined;
       return found
-        ? card(escape(found.name ?? "Object"), `<p>Last seen ${escape(found.locationNote)}</p>`)
+        ? card(String(found.name ?? "Object"), `<p>Last seen ${found.locationNote ? escape(found.locationNote) : "an unknown place"}</p>`)
         : `<p class="empty">I don't have a location for that.</p>`;
     }
     default:

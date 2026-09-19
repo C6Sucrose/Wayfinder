@@ -180,3 +180,16 @@ describe("resources and prompt", () => {
     await client.close();
   });
 });
+
+describe("list_items voice-first", () => {
+  it("speaks each item's read-aloud text", async () => {
+    const { client, store } = await connect();
+    await store.putItem(item({
+      itemId: "itm_voice", readAloudText: "Distinctive read-aloud sentence for the list."
+    }));
+    const res = await client.callTool({ name: "list_items", arguments: { filter: "all" } });
+    const text = (res.content as Array<{ text: string }>)[0]!.text;
+    expect(text).toContain("Distinctive read-aloud sentence for the list.");
+    await client.close();
+  });
+});

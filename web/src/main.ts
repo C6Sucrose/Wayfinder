@@ -70,7 +70,7 @@ resetButton.addEventListener("click", () => {
   host.reset();
   transcript.replaceChildren();
   events.textContent = "";
-  brain.textContent = "rules";
+  brain.textContent = "";
   screen.replaceChildren();
   utterance.value = "";
 });
@@ -107,6 +107,7 @@ if (SpeechRecognitionCtor) {
   talk.addEventListener("pointerdown", start);
   talk.addEventListener("pointerup", stop);
   talk.addEventListener("pointerleave", stop);
+  talk.addEventListener("click", () => (listening ? stop() : start()));
 } else {
   talk.disabled = true;
   talk.textContent = "Voice unavailable — use the text box";

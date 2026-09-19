@@ -1,8 +1,8 @@
 :root {
-  --wf-bg: var(--mcp-color-background, #ffffff);
-  --wf-fg: var(--mcp-color-text, #111111);
-  --wf-muted: var(--mcp-color-text-secondary, #555555);
-  --wf-accent: var(--mcp-color-accent, #0a5bd3);
+  --wf-bg: var(--color-background-primary, #ffffff);
+  --wf-fg: var(--color-text-primary, #111111);
+  --wf-muted: var(--color-text-secondary, #555555);
+  --wf-accent: var(--color-text-info, #0a5bd3);
   --wf-alert-bg: #fff3f2; --wf-alert-fg: #8a1f11;
   --wf-info-bg: #eff6ff; --wf-info-fg: #1e40af;
   --wf-radius: 12px; --wf-gap: 12px;
