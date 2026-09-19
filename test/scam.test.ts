@@ -29,4 +29,18 @@ describe("scoreScam", () => {
     const r = scoreScam("Pay now.", { hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true, genericSalutation: false });
     expect(r.riskScore).toBe(0.7);
   });
+
+  it("raises a generic-greeting phishing mail out of the low band", () => {
+    const r = scoreScam("Dear customer, urgent: pay now", {
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false, genericSalutation: true
+    });
+    expect(r.band).not.toBe("low");
+  });
+
+  it("keeps a normal bill with a generic greeting in the low band", () => {
+    const r = scoreScam("Dear customer, payment due 2026-10-01.", {
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false, genericSalutation: true
+    });
+    expect(r.band).toBe("low");
+  });
 });
