@@ -60,13 +60,27 @@ if (SpeechRecognitionCtor) {
     lang: string; interimResults: boolean; continuous: boolean;
     start(): void; stop(): void;
     onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+    onend: () => void; onerror: () => void;
   };
   recognition.lang = "en-US";
   recognition.interimResults = false;
   recognition.continuous = false;
   recognition.onresult = (e) => { void send(e.results[0]![0]!.transcript); };
-  const start = () => { talk.setAttribute("aria-pressed", "true"); recognition.start(); };
-  const stop = () => { talk.setAttribute("aria-pressed", "false"); recognition.stop(); };
+  let listening = false;
+  const reset = () => { listening = false; talk.setAttribute("aria-pressed", "false"); };
+  recognition.onend = reset;
+  recognition.onerror = reset;
+  const start = () => {
+    if (listening) return;
+    listening = true;
+    talk.setAttribute("aria-pressed", "true");
+    try { recognition.start(); } catch { reset(); }
+  };
+  const stop = () => {
+    if (!listening) return;
+    reset();
+    try { recognition.stop(); } catch { reset(); }
+  };
   talk.addEventListener("pointerdown", start);
   talk.addEventListener("pointerup", stop);
   talk.addEventListener("pointerleave", stop);
