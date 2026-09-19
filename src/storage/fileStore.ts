@@ -36,7 +36,7 @@ export function createFileStore(dir: string): Store {
     },
     async putAction() { /* actions are stored on items in this plan */ },
     async listActions() { return []; },
-    async putObject(o) { writeJson(join(dir, `object-${o.objectId}.json`), o); },
+    async putObject(o) { assertSafeId(o.objectId); writeJson(join(dir, `object-${o.objectId}.json`), o); },
     async listObjects() {
       return readdirSync(dir).filter((f) => f.startsWith("object-"))
         .map((f) => readJson<import("../domain/model.js").StoredObject>(join(dir, f))!).filter(Boolean);

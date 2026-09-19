@@ -32,4 +32,23 @@ describe("classifyText", () => {
     const r = classifyText("Hi, hope you are well. See you soon.", noSignals);
     expect(["personal", "junk"]).toContain(r.class);
   });
+
+  it("keeps a legitimate final-notice bill classified as a bill", () => {
+    const r = classifyText("Amount due: €84.20. Payment due 1 October 2026. Final notice.", {
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false
+    });
+    expect(r.class).toBe("bill");
+  });
+
+  it("flags a gift-card demand corroborated by urgency and sender mismatch", () => {
+    const r = classifyText("Urgent: pay with gift cards to release your parcel.", {
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: true
+    });
+    expect(r.class).toBe("scam");
+  });
+
+  it("does not match words that merely contain rule substrings", () => {
+    expect(classifyText("Take a taxi to the office.", noSignals).class).not.toBe("government");
+    expect(classifyText("Please determine the outcome.", noSignals).class).not.toBe("appointment");
+  });
 });

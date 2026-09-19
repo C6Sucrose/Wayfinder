@@ -4,9 +4,10 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Store } from "../storage/types.js";
+import type { Extractor } from "../domain/scanPipeline.js";
 import { buildServer } from "../mcp/server.js";
 
-export function createHttpApp(deps: { store: Store }) {
+export function createHttpApp(deps: { store: Store; extract?: Extractor }) {
   const app = express();
   app.use(express.json({ limit: "10mb" }));
   const transports = new Map<string, StreamableHTTPServerTransport>();

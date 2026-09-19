@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFileStore } from "../src/storage/fileStore.js";
-import type { Item, Scan } from "../src/domain/model.js";
+import type { Item, Scan, StoredObject } from "../src/domain/model.js";
 
 const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-sec-")));
 
@@ -27,6 +27,13 @@ const unsafeScan: Scan = {
   createdAt: new Date().toISOString()
 };
 
+const unsafeObject: StoredObject = {
+  objectId: "../../etc/passwd",
+  name: "keys",
+  locationNote: "somewhere",
+  lastSeenAt: new Date().toISOString()
+};
+
 describe("fileStore id sanitization", () => {
   it("rejects path traversal ids on getItem", async () => {
     await expect(store.getItem("../../etc/passwd")).rejects.toThrow(/invalid id/i);
@@ -42,6 +49,10 @@ describe("fileStore id sanitization", () => {
 
   it("rejects unsafe ids on putScan", async () => {
     await expect(store.putScan(unsafeScan)).rejects.toThrow(/invalid id/i);
+  });
+
+  it("rejects unsafe ids on putObject", async () => {
+    await expect(store.putObject(unsafeObject)).rejects.toThrow(/invalid id/i);
   });
 
   it("allows well-formed ids that are absent", async () => {

@@ -16,4 +16,17 @@ describe("scoreScam", () => {
     });
     expect(r.band).toBe("low");
   });
+
+  it("keeps an ordinary payment-due bill out of the high band", () => {
+    const r = scoreScam("Payment due by 1 October 2026. Final notice.", {
+      hasQrOrLink: false, hasPaymentRequest: true, senderMismatch: false
+    });
+    expect(r.band).not.toBe("high");
+    expect(r.riskScore).toBeLessThan(0.35);
+  });
+
+  it("rounds the risk score to two decimals", () => {
+    const r = scoreScam("Pay now.", { hasQrOrLink: true, hasPaymentRequest: true, senderMismatch: true });
+    expect(r.riskScore).toBe(0.7);
+  });
 });
