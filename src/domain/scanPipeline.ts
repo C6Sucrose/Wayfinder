@@ -31,7 +31,11 @@ export async function runScan(store: Store, input: ScanInput): Promise<Scan> {
       const signals = {
         hasQrOrLink: /https?:\/\/|\bQR\b/i.test(text),
         hasPaymentRequest: /\b(?:pay|payment|transfer|überweisen)\b/i.test(text),
-        senderMismatch: /\bdear customer\b/i.test(text)
+        // Requires real sender/return-address metadata, which the deterministic
+        // pipeline does not have; Plan 3's extractor may supply it. Never infer
+        // a mismatch from a salutation.
+        senderMismatch: false,
+        genericSalutation: /\bdear (?:customer|sir\/madam|account holder)\b/i.test(text)
       };
       const { class: cls, confidence } = classifyText(text, signals);
       const fields = extractFields(text, cls);
@@ -55,10 +59,20 @@ export async function runScan(store: Store, input: ScanInput): Promise<Scan> {
     return failed;
   }
 
-  // Persist only after every text was analyzed successfully, so a failure
-  // never leaves a partially-written scan behind.
-  for (const item of items) {
-    await store.putItem(item);
+  const written: string[] = [];
+  try {
+    for (const item of items) {
+      await store.putItem(item);
+      written.push(item.itemId);
+    }
+  } catch (err) {
+    console.error(`[scanPipeline] scan ${scanId} failed while persisting:`, err);
+    for (const id of written.reverse()) {
+      try { await store.deleteItem(id); } catch (e) { console.error(`[scanPipeline] rollback of ${id} failed:`, e); }
+    }
+    const failed: Scan = { ...scan, status: "failed" };
+    await store.putScan(failed);
+    return failed;
   }
 
   const done: Scan = { ...scan, status: items.length > 0 ? "ready" : "failed" };

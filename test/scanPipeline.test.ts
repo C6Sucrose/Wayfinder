@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFileStore } from "../src/storage/fileStore.js";
 import { runScan } from "../src/domain/scanPipeline.js";
+import type { Store } from "../src/storage/types.js";
 
 let store: ReturnType<typeof createFileStore>;
 beforeEach(() => { store = createFileStore(mkdtempSync(join(tmpdir(), "wf-"))); });
@@ -61,5 +62,24 @@ describe("runScan", () => {
     expect(scan.status).toBe("failed");
     const items = await store.listItems("all");
     expect(items.filter((i) => i.scanId === scan.scanId)).toHaveLength(0);
+  });
+});
+
+describe("runScan persistence atomicity", () => {
+  it("rolls back written items and marks the scan failed when a write throws", async () => {
+    const real = createFileStore(mkdtempSync(join(tmpdir(), "wf-")));
+    let writes = 0;
+    const flaky: Store = {
+      ...real,
+      putItem: async (i) => { writes += 1; if (writes === 2) throw new Error("disk full"); return real.putItem(i); },
+      listItems: (f) => real.listItems(f)
+    };
+    const scan = await runScan(flaky, {
+      imageRefs: ["a"], hint: "mail",
+      extractedText: ["Amount due: €10. Payment due 2026-10-01.", "Your appointment is on 2026-11-02."]
+    });
+    expect(scan.status).toBe("failed");
+    const remaining = (await real.listItems("all")).filter((i) => i.scanId === scan.scanId);
+    expect(remaining).toHaveLength(0);
   });
 });

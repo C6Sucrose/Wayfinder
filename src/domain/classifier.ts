@@ -4,6 +4,7 @@ export interface Signals {
   hasQrOrLink: boolean;
   hasPaymentRequest: boolean;
   senderMismatch: boolean;
+  genericSalutation: boolean;
 }
 
 interface Rule { cls: DocClass; patterns: RegExp[]; weight: number; reason: string }
@@ -38,6 +39,7 @@ export function classifyText(text: string, signals: Signals): { class: DocClass;
   if (corroboratedPayment) { scamScore += 2; reasons.push("asks for a payment in a suspicious context"); }
   if (signals.hasQrOrLink) { scamScore += 1; reasons.push("contains a link or QR code"); }
   if (signals.senderMismatch) { scamScore += 2; reasons.push("sender does not match the claimed organisation"); }
+  if (signals.genericSalutation) { scamScore += 1; reasons.push("uses a generic greeting often seen in scam mail"); }
   if (urgent) { scamScore += 2; reasons.push("uses urgent or threatening language"); }
   if (gift) { scamScore += 2; reasons.push("asks for gift-card payment"); }
   if (scamScore >= 3) {
