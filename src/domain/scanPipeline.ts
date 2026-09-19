@@ -62,8 +62,11 @@ export async function runScan(store: Store, input: ScanInput): Promise<Scan> {
   const written: string[] = [];
   try {
     for (const item of items) {
-      await store.putItem(item);
+      // Record before writing: if putItem persists and then throws, the id must
+      // still be rolled back. Ids are freshly generated and deleteItem is
+      // idempotent, so an id for a write that never landed is harmless.
       written.push(item.itemId);
+      await store.putItem(item);
     }
   } catch (err) {
     console.error(`[scanPipeline] scan ${scanId} failed while persisting:`, err);

@@ -82,4 +82,21 @@ describe("runScan persistence atomicity", () => {
     const remaining = (await real.listItems("all")).filter((i) => i.scanId === scan.scanId);
     expect(remaining).toHaveLength(0);
   });
+
+  it("rolls back an item that persists and then throws", async () => {
+    const real = createFileStore(mkdtempSync(join(tmpdir(), "wf-")));
+    let writes = 0;
+    const flaky: Store = {
+      ...real,
+      putItem: async (i) => { writes += 1; await real.putItem(i); if (writes === 2) throw new Error("ack lost"); },
+      listItems: (f) => real.listItems(f)
+    };
+    const scan = await runScan(flaky, {
+      imageRefs: ["a"], hint: "mail",
+      extractedText: ["Amount due: €10. Payment due 2026-10-01.", "Your appointment is on 2026-11-02."]
+    });
+    expect(scan.status).toBe("failed");
+    const remaining = (await real.listItems("all")).filter((i) => i.scanId === scan.scanId);
+    expect(remaining).toHaveLength(0);
+  });
 });
