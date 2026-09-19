@@ -108,6 +108,34 @@ describe("async capture_scan", () => {
     await worker.close();
   });
 
+  it("returns the overload error without creating a scan when the worker queue is full", async () => {
+    const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-overload-")));
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const extract = async () => {
+      await gate;
+      return ["Amount due: €84.20. Payment due 2026-10-01."];
+    };
+    const worker = createScanWorker({ store, extract, maxQueue: 1 });
+    const server = buildServer({ store, extract, worker });
+    const client = new Client({ name: "test", version: "0.0.1" });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(a), client.connect(b)]);
+
+    const first = await client.callTool({ name: "capture_scan", arguments: { imageRefs: ["img"], hint: "mail" } });
+    expect((first.structuredContent as { status?: string }).status).toBe("queued");
+
+    const second = await client.callTool({ name: "capture_scan", arguments: { imageRefs: ["img2"], hint: "mail" } });
+    expect(second.isError).toBe(true);
+    expect(textOf(second)).toBe(copy.toolUnavailable);
+    expect((second.structuredContent as { available?: boolean }).available).toBe(false);
+
+    release();
+    await worker.idle();
+    await client.close();
+    await worker.close();
+  });
+
   it("keeps the reader-unavailable path when no extractor is configured", async () => {
     const { client, store, worker } = await connect();
     const res = await client.callTool({ name: "capture_scan", arguments: { imageRefs: ["x"], hint: "mail" } });

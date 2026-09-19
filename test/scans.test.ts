@@ -72,6 +72,19 @@ describe("processScan", () => {
     expect((await store.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(0);
   });
 
+  it("coalesces concurrent runs for the same scan so items are not duplicated", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const texts = ["Amount due: €10. Payment due 2026-10-01."];
+    const [first, second] = await Promise.all([
+      processScan(store, scan.scanId, texts),
+      processScan(store, scan.scanId, texts)
+    ]);
+    expect(first.status).toBe("ready");
+    expect(second.status).toBe("ready");
+    expect(second).toEqual(first);
+    expect((await store.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(1);
+  });
+
   it("replaces stale items from a prior attempt instead of duplicating them", async () => {
     const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
     const texts = ["Amount due: €10. Payment due 2026-10-01."];

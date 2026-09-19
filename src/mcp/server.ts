@@ -39,8 +39,25 @@ export function buildServer(deps: ServerDeps): McpServer {
           structuredContent: { available: false, count: 0 }
         };
       }
-      const scan = await createScan(deps.store, { imageRefs, hint });
-      deps.worker.enqueue({ scanId: scan.scanId, imageRefs, hint });
+      if (deps.worker.isFull()) {
+        return {
+          content: [{ type: "text", text: copy.toolUnavailable }],
+          isError: true as const,
+          structuredContent: { available: false }
+        };
+      }
+      let scan;
+      try {
+        scan = await createScan(deps.store, { imageRefs, hint });
+        deps.worker.enqueue({ scanId: scan.scanId, imageRefs, hint });
+      } catch (err) {
+        console.error("[capture_scan] enqueue failed:", err);
+        return {
+          content: [{ type: "text", text: copy.toolUnavailable }],
+          isError: true as const,
+          structuredContent: { available: false }
+        };
+      }
       return {
         content: [{ type: "text", text: copy.scanStarted }],
         structuredContent: { scanId: scan.scanId, status: "queued", available: true }

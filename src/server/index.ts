@@ -11,6 +11,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
 const dir = process.env.WAYFINDER_DATA_DIR ?? "data";
+const captureRoot = process.env.WAYFINDER_CAPTURE_ROOT ?? dir;
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const port = Number(process.env.PORT ?? 8080);
 const host = resolveHost();
@@ -21,7 +22,7 @@ const bedrock = modelId ? new BedrockRuntimeClient({ region: process.env.AWS_REG
 const converse = bedrock
   ? { send: (input: unknown) => bedrock.send(new ConverseCommand(input as never)) }
   : undefined;
-const extract = modelId && converse ? createBedrockExtractor({ client: converse, modelId }) : undefined;
+const extract = modelId && converse ? createBedrockExtractor({ client: converse, modelId, allowedRoot: captureRoot }) : undefined;
 
 const deps: HttpDeps = { store, allowedOrigins, ...(extract ? { extract } : {}) };
 const app = createHttpApp(deps);
