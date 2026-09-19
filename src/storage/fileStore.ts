@@ -1,8 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import type { ZodType, ZodTypeDef } from "zod";
 import type { Store } from "./types.js";
-import { PreferencesSchema, type Action, type Item, type Scan, type StoredObject } from "../domain/model.js";
+import {
+  ActionSchema, ItemSchema, PreferencesSchema, ScanSchema, StoredObjectSchema,
+  type Action, type Item, type Scan, type StoredObject
+} from "../domain/model.js";
 
 const ID_PATTERN = /^[a-z]+_[a-z0-9-]{1,64}$/;
 
@@ -29,11 +33,31 @@ export function createFileStore(dir: string): Store {
       return null;
     }
   };
+  const readValidated = <T>(p: string, schema: ZodType<T, ZodTypeDef, unknown>): T | null => {
+    const raw = readJson<unknown>(p);
+    if (raw === null) return null;
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) {
+      console.error(`[fileStore] skipping invalid file ${p}:`, parsed.error);
+      return null;
+    }
+    return parsed.data;
+  };
   const writeJson = (p: string, v: unknown) => writeFileSync(p, JSON.stringify(v, null, 2), "utf8");
   const readActions = (itemId: string): Action[] => {
     assertSafeId(itemId);
-    const v = readJson<Action[]>(join(actionsDir, `${itemId}.json`));
-    return Array.isArray(v) ? v : [];
+    const raw = readJson<unknown>(join(actionsDir, `${itemId}.json`));
+    if (!Array.isArray(raw)) return [];
+    const actions: Action[] = [];
+    for (const entry of raw) {
+      const parsed = ActionSchema.safeParse(entry);
+      if (!parsed.success) {
+        console.error(`[fileStore] skipping invalid action for ${itemId}:`, parsed.error);
+        continue;
+      }
+      actions.push(parsed.data);
+    }
+    return actions;
   };
   const isFlagged = (item: Item): boolean =>
     item.class === "scam" ||
@@ -41,13 +65,13 @@ export function createFileStore(dir: string): Store {
 
   return {
     async putScan(s) { assertSafeId(s.scanId); writeJson(join(scansDir, `${s.scanId}.json`), s); },
-    async getScan(id) { assertSafeId(id); return readJson<Scan>(join(scansDir, `${id}.json`)); },
+    async getScan(id) { assertSafeId(id); return readValidated<Scan>(join(scansDir, `${id}.json`), ScanSchema); },
     async putItem(i) { assertSafeId(i.itemId); writeJson(join(itemsDir, `${i.itemId}.json`), i); },
-    async getItem(id) { assertSafeId(id); return readJson<Item>(join(itemsDir, `${id}.json`)); },
+    async getItem(id) { assertSafeId(id); return readValidated<Item>(join(itemsDir, `${id}.json`), ItemSchema); },
     async deleteItem(id) { assertSafeId(id); rmSync(join(itemsDir, `${id}.json`), { force: true }); },
     async listItems(filter) {
       const all = readdirSync(itemsDir)
-        .map((f) => readJson<Item>(join(itemsDir, f)))
+        .map((f) => readValidated<Item>(join(itemsDir, f), ItemSchema))
         .filter((i): i is Item => i !== null);
       if (filter === "all") return all;
       if (filter === "unresolved") return all.filter((i) => i.resolvedAt === null);
@@ -65,10 +89,18 @@ export function createFileStore(dir: string): Store {
     async putObject(o) { assertSafeId(o.objectId); writeJson(join(dir, `object-${o.objectId}.json`), o); },
     async listObjects() {
       return readdirSync(dir).filter((f) => f.startsWith("object-"))
-        .map((f) => readJson<StoredObject>(join(dir, f)))
+        .map((f) => readValidated<StoredObject>(join(dir, f), StoredObjectSchema))
         .filter((o): o is StoredObject => o !== null);
     },
-    async getPreferences() { return PreferencesSchema.parse(readJson(join(dir, "preferences.json")) ?? {}); },
+    async getPreferences() {
+      const raw = readJson<unknown>(join(dir, "preferences.json"));
+      const parsed = PreferencesSchema.safeParse(raw ?? {});
+      if (!parsed.success) {
+        console.error("[fileStore] using default preferences; invalid preferences.json:", parsed.error);
+        return PreferencesSchema.parse({});
+      }
+      return parsed.data;
+    },
     async putPreferences(p) { writeJson(join(dir, "preferences.json"), p); }
   };
 }
