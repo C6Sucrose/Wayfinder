@@ -13,10 +13,15 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Start reading images the customer captured. Use for mail, labels, or objects.",
     { imageRefs: z.array(z.string()).min(1), hint: z.enum(["mail", "label", "object", "scene", "auto"]).default("auto") },
     async ({ imageRefs, hint }) => {
-      const extract: Extractor = deps.extract ?? (async () => []);
+      if (!deps.extract) {
+        return {
+          content: [{ type: "text", text: copy.readerUnavailable }],
+          structuredContent: { available: false, count: 0 }
+        };
+      }
       let extractedText: string[];
       try {
-        extractedText = await extract(imageRefs, hint);
+        extractedText = await deps.extract(imageRefs, hint);
       } catch (err) {
         console.error("[capture_scan] extractor failed:", err);
         extractedText = [];
@@ -26,7 +31,7 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
       const mine = items.filter((i) => i.scanId === scan.scanId);
       return {
         content: [{ type: "text", text: mine.length ? `I read ${mine.length} item(s).` : copy.scanFailed }],
-        structuredContent: { scanId: scan.scanId, count: mine.length }
+        structuredContent: { scanId: scan.scanId, count: mine.length, available: true }
       };
     }
   );
