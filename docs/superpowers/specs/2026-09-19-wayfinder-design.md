@@ -179,14 +179,16 @@ Wayfinder closes the loop from *seeing* to *done*, on a voice-first device, with
 |---|------|--------|--------|--------|
 | 1 | `capture_scan` | `imageRefs[]`, `hint` (`mail`\|`label`\|`object`\|`scene`\|`auto`) | `scanId`, interim spoken text | — |
 | 2 | `get_scan` | `scanId` | `items[]` (`itemId`, `class`, `confidence`, `fields`, `proposedActions[]`, `readAloudText`) | item cards |
-| 3 | `act_on_item` | `itemId`, `action` (`remind`\|`schedule`\|`flag`\|`file`\|`share`\|`discard`), `params` | confirmation | action buttons |
+| 3 | `act_on_item` | `itemId`, `actionId` | confirmation `{action, item}` | action buttons |
 | 4 | `list_items` | `filter` (`unresolved`\|`due`\|`flagged`\|`all`) | `items[]` | inbox |
 | 5 | `get_item` | `itemId` | full detail + read-aloud text | detail |
-| 6 | `identify_product` | `imageRefs[]` | `{name, category, expiry, ingredients, allergens, labelText, disclaimer}` | label read-back |
-| 7 | `remember_object` | `objectName`, `imageRefs[]`, `locationNote?` | `objectId`, confirmation | object card |
-| 8 | `find_object` | `objectName` | `{found, locationNote, lastSeenAt}` | object card |
+| 6 | `identify_product` | `imageRefs[]` | `{name, details[], labelText, disclaimer}` | label read-back |
+| 7 | `remember_object` | `name`, `locationNote`, `imageRef?` | stored object | object card |
+| 8 | `find_object` | `name` | `{found}` | object card |
 | 9 | `daily_briefing` | `date?` | `{due[], appointments[], flagged[], objectReminders[]}` | briefing |
 | 10 | `update_preferences` | `verbosity`, `trustedContactAlias?`, `largeText?` | updated preferences | preferences |
+
+`act_on_item` addresses a specific proposed action by its stable `actionId` (not a raw `type`/`params`), which keeps the call idempotent and lets the server resolve the action's parameters from the stored item. `date` on `daily_briefing` is the reference date for the `due` filter; `appointments` are unresolved `appointment`-class items with an `appointmentAt`.
 
 **Resources:** `wayfinder://inbox` (unresolved items), `wayfinder://objects` (object memory).
 **Prompt:** `morning_briefing`.
