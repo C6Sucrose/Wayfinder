@@ -107,7 +107,13 @@ if (SpeechRecognitionCtor) {
   talk.addEventListener("pointerdown", start);
   talk.addEventListener("pointerup", stop);
   talk.addEventListener("pointerleave", stop);
-  talk.addEventListener("click", () => (listening ? stop() : start()));
+  // Only keyboard-synthesized clicks toggle; pointer clicks are handled by the
+  // pointerdown/pointerup/pointerleave hold-to-talk handlers above.
+  talk.addEventListener("click", (event) => {
+    if (event.detail !== 0) return;
+    if (listening) stop();
+    else start();
+  });
 } else {
   talk.disabled = true;
   talk.textContent = "Voice unavailable — use the text box";
