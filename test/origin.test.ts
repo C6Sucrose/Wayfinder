@@ -46,6 +46,12 @@ describe("/mcp origin enforcement", () => {
     });
     expect(res.status).toBe(403);
   });
+  it("rejects a disallowed Origin even when the body is invalid JSON", async () => {
+    const res = await fetch(`${base}/mcp`, {
+      method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" }, body: "{not json"
+    });
+    expect(res.status).toBe(403);
+  });
   it("accepts a loopback Origin", async () => {
     const res = await fetch(`${base}/mcp`, {
       method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", origin: "http://localhost:5173" }, body: JSON.stringify(initBody)

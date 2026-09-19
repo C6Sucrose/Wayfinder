@@ -22,17 +22,23 @@ export function resolveHost(env: NodeJS.ProcessEnv = process.env): string {
 
 export function createHttpApp(deps: { store: Store; extract?: Extractor; allowedOrigins?: string[] }) {
   const app = express();
-  app.use(express.json({ limit: "10mb" }));
   const allowed = deps.allowedOrigins ?? [];
   const transports = new Map<string, StreamableHTTPServerTransport>();
+
+  // Enforce Origin before body parsing so a disallowed origin gets 403 even when
+  // its body is malformed or oversized.
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/mcp") && !isAllowedOrigin(req.headers.origin, allowed)) {
+      res.status(403).json({ jsonrpc: "2.0", error: { code: -32000, message: "Forbidden: origin not allowed" }, id: null });
+      return;
+    }
+    next();
+  });
+  app.use(express.json({ limit: "10mb" }));
 
   app.get("/healthz", (_req, res) => { res.json({ ok: true }); });
 
   const handle = async (req: express.Request, res: express.Response) => {
-    if (!isAllowedOrigin(req.headers.origin, allowed)) {
-      res.status(403).json({ jsonrpc: "2.0", error: { code: -32000, message: "Forbidden: origin not allowed" }, id: null });
-      return;
-    }
     const sessionId = req.headers["mcp-session-id"];
     let transport: StreamableHTTPServerTransport | undefined =
       typeof sessionId === "string" ? transports.get(sessionId) : undefined;
