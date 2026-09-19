@@ -177,8 +177,11 @@ export function buildServer(deps: ServerDeps): McpServer {
       } catch (err) {
         return safeError("list_items", err);
       }
+      const spoken = items
+        .map((i) => (i.class === "label" ? `${i.readAloudText} ${copy.disclaimers.label}` : i.readAloudText))
+        .join(" ");
       return {
-        content: [{ type: "text", text: items.length ? copy.itemsListed(items.length) : copy.nothingFound }],
+        content: [{ type: "text", text: spoken || copy.nothingFound }],
         structuredContent: { items }
       };
     }
