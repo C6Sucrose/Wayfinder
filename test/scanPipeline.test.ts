@@ -21,4 +21,22 @@ describe("runScan", () => {
     expect(items[0]!.class).toBe("bill");
     expect(items[0]!.proposedActions.map((a) => a.type)).toContain("remind");
   });
+
+  it("persists a failed scan when processing a text throws", async () => {
+    const scan = await runScan(store, {
+      imageRefs: ["img1"],
+      hint: "mail",
+      extractedText: [null as unknown as string]
+    });
+    expect(scan.status).toBe("failed");
+    const stored = await store.getScan(scan.scanId);
+    expect(stored!.status).toBe("failed");
+  });
+
+  it("marks the scan failed when no text was extracted", async () => {
+    const scan = await runScan(store, { imageRefs: ["img1"], hint: "mail", extractedText: [] });
+    expect(scan.status).toBe("failed");
+    const stored = await store.getScan(scan.scanId);
+    expect(stored!.status).toBe("failed");
+  });
 });
