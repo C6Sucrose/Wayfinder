@@ -77,4 +77,24 @@ describe("scan worker", () => {
       "Worker is closed."
     );
   });
+
+  it("keeps draining when onComplete throws", async () => {
+    const attempted: string[] = [];
+    const worker = createScanWorker({
+      store,
+      extract: async () => ["Amount due: €10. Payment due 2026-10-01."],
+      onComplete: (id) => { attempted.push(id); throw new Error("notifier down"); }
+    });
+    const first = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const second = await createScan(store, { imageRefs: ["b"], hint: "mail" });
+    worker.enqueue({ scanId: first.scanId, imageRefs: ["a"], hint: "mail" });
+    worker.enqueue({ scanId: second.scanId, imageRefs: ["b"], hint: "mail" });
+    await worker.idle();
+    const statuses = await Promise.all(
+      [first, second].map(async (s) => (await store.getScan(s.scanId))?.status)
+    );
+    expect(statuses).toEqual(["ready", "ready"]);
+    expect(attempted).toEqual([first.scanId, second.scanId]);
+    await worker.close();
+  }, 15000);
 });
