@@ -4,6 +4,14 @@ import { randomUUID } from "node:crypto";
 import type { Store } from "./types.js";
 import { PreferencesSchema, type Item, type Scan } from "../domain/model.js";
 
+const ID_PATTERN = /^[a-z]+_[a-z0-9-]{1,64}$/;
+
+export function assertSafeId(id: string): void {
+  if (!ID_PATTERN.test(id)) {
+    throw new Error(`Invalid id: ${id}`);
+  }
+}
+
 export function createFileStore(dir: string): Store {
   const itemsDir = join(dir, "items");
   const scansDir = join(dir, "scans");
@@ -14,10 +22,10 @@ export function createFileStore(dir: string): Store {
   const writeJson = (p: string, v: unknown) => writeFileSync(p, JSON.stringify(v, null, 2), "utf8");
 
   return {
-    async putScan(s) { writeJson(join(scansDir, `${s.scanId}.json`), s); },
-    async getScan(id) { return readJson<Scan>(join(scansDir, `${id}.json`)); },
-    async putItem(i) { writeJson(join(itemsDir, `${i.itemId}.json`), i); },
-    async getItem(id) { return readJson<Item>(join(itemsDir, `${id}.json`)); },
+    async putScan(s) { assertSafeId(s.scanId); writeJson(join(scansDir, `${s.scanId}.json`), s); },
+    async getScan(id) { assertSafeId(id); return readJson<Scan>(join(scansDir, `${id}.json`)); },
+    async putItem(i) { assertSafeId(i.itemId); writeJson(join(itemsDir, `${i.itemId}.json`), i); },
+    async getItem(id) { assertSafeId(id); return readJson<Item>(join(itemsDir, `${id}.json`)); },
     async listItems(filter) {
       const all = readdirSync(itemsDir).map((f) => readJson<Item>(join(itemsDir, f))!).filter(Boolean);
       if (filter === "all") return all;
