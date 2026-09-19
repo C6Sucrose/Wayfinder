@@ -1,5 +1,6 @@
 import type { Store } from "../storage/types.js";
 import type { Action, Item } from "./model.js";
+import { copy } from "./copy.js";
 
 export interface ApplyResult {
   item: Item;
@@ -15,7 +16,7 @@ export async function applyAction(store: Store, itemId: string, actionId: string
 
   if (action.status === "done" || action.status === "confirmed") {
     await store.putAction(action);
-    return { item, action, message: "That's already done." };
+    return { item, action, message: copy.actions.alreadyDone };
   }
 
   if (action.type === "remind" && typeof action.params.on !== "string") {
@@ -31,14 +32,14 @@ export async function applyAction(store: Store, itemId: string, actionId: string
   let message: string;
 
   switch (action.type) {
-    case "remind": message = "I'll remind you about that."; break;
-    case "schedule": message = "I've added that to your calendar."; break;
-    case "flag": message = "I've flagged that for you."; break;
-    case "file": resolvedAt = now; message = "Filed."; break;
-    case "discard": resolvedAt = now; message = "Discarded."; break;
+    case "remind": message = copy.actions.remind; break;
+    case "schedule": message = copy.actions.schedule; break;
+    case "flag": message = copy.actions.flag; break;
+    case "file": resolvedAt = now; message = copy.actions.file; break;
+    case "discard": resolvedAt = now; message = copy.actions.discard; break;
     case "share":
       if (!preferences.trustedContactAlias) throw new Error("No trusted contact is set up.");
-      message = `Shared with ${preferences.trustedContactAlias}.`;
+      message = copy.actions.share(preferences.trustedContactAlias);
       break;
   }
 

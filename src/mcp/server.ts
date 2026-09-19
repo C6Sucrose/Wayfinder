@@ -7,9 +7,18 @@ import { rememberObject, findObject } from "../domain/objectMemory.js";
 import { applyAction } from "../domain/applyAction.js";
 import { parseLabel } from "../domain/labelParser.js";
 import { redactSensitive } from "../domain/redact.js";
+import type { Item } from "../domain/model.js";
 
 export function buildServer(deps: { store: Store; extract?: Extractor }): McpServer {
   const server = new McpServer({ name: "wayfinder", version: "0.1.0" });
+
+  const safeError = (tool: string, err: unknown) => {
+    console.error(`[${tool}] failed:`, err);
+    return {
+      content: [{ type: "text" as const, text: copy.toolFailed }],
+      isError: true as const
+    };
+  };
 
   server.tool(
     "capture_scan",
@@ -33,7 +42,7 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
       const items = await deps.store.listItems("all");
       const mine = items.filter((i) => i.scanId === scan.scanId);
       return {
-        content: [{ type: "text", text: mine.length ? `I read ${mine.length} item(s).` : copy.scanFailed }],
+        content: [{ type: "text", text: mine.length ? copy.scanRead(mine.length) : copy.scanFailed }],
         structuredContent: { scanId: scan.scanId, count: mine.length, available: true }
       };
     }
@@ -44,7 +53,12 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Return the items found in a previous scan, with their suggested actions.",
     { scanId: z.string() },
     async ({ scanId }) => {
-      const items = (await deps.store.listItems("all")).filter((i) => i.scanId === scanId);
+      let items: Item[];
+      try {
+        items = (await deps.store.listItems("all")).filter((i) => i.scanId === scanId);
+      } catch (err) {
+        return safeError("get_scan", err);
+      }
       const spoken = items
         .map((i) => (i.class === "label" ? `${i.readAloudText} ${copy.disclaimers.label}` : i.readAloudText))
         .join(" ");
@@ -60,9 +74,14 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Find where an object was last seen.",
     { name: z.string() },
     async ({ name }) => {
-      const found = await findObject(deps.store, name);
+      let found;
+      try {
+        found = await findObject(deps.store, name);
+      } catch (err) {
+        return safeError("find_object", err);
+      }
       return {
-        content: [{ type: "text", text: found ? `Last seen ${found.locationNote}.` : `I don't have a location for ${name}.` }],
+        content: [{ type: "text", text: found ? copy.lastSeen(found.locationNote) : copy.noLocation(name) }],
         structuredContent: { found }
       };
     }
@@ -73,8 +92,13 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Remember where an object is.",
     { name: z.string(), locationNote: z.string(), imageRef: z.string().optional() },
     async ({ name, locationNote, imageRef }) => {
-      const obj = await rememberObject(deps.store, imageRef ? { name, locationNote, imageRef } : { name, locationNote });
-      return { content: [{ type: "text", text: `Saved ${obj.name}.` }], structuredContent: { object: obj } };
+      let obj;
+      try {
+        obj = await rememberObject(deps.store, imageRef ? { name, locationNote, imageRef } : { name, locationNote });
+      } catch (err) {
+        return safeError("remember_object", err);
+      }
+      return { content: [{ type: "text", text: copy.savedObject(obj.name) }], structuredContent: { object: obj } };
     }
   );
 
@@ -90,11 +114,7 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
           structuredContent: { action: result.action, item: result.item }
         };
       } catch (err) {
-        console.error("[act_on_item] failed:", err);
-        return {
-          content: [{ type: "text", text: "I couldn't do that — please choose the action again." }],
-          isError: true
-        };
+        return safeError("act_on_item", err);
       }
     }
   );
@@ -104,9 +124,14 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "List the customer's items, optionally filtered to unresolved, due, or flagged.",
     { filter: z.enum(["unresolved", "due", "flagged", "all"]).default("unresolved") },
     async ({ filter }) => {
-      const items = await deps.store.listItems(filter);
+      let items: Item[];
+      try {
+        items = await deps.store.listItems(filter);
+      } catch (err) {
+        return safeError("list_items", err);
+      }
       return {
-        content: [{ type: "text", text: items.length ? `${items.length} item(s).` : copy.nothingFound }],
+        content: [{ type: "text", text: items.length ? copy.itemsListed(items.length) : copy.nothingFound }],
         structuredContent: { items }
       };
     }
@@ -117,7 +142,12 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Return one item's full detail and read-aloud text.",
     { itemId: z.string() },
     async ({ itemId }) => {
-      const item = await deps.store.getItem(itemId);
+      let item: Item | null;
+      try {
+        item = await deps.store.getItem(itemId);
+      } catch (err) {
+        return safeError("get_item", err);
+      }
       if (!item) {
         return { content: [{ type: "text", text: copy.nothingFound }], isError: true };
       }
@@ -135,10 +165,14 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
       largeText: z.boolean().optional()
     },
     async (patch) => {
-      const current = await deps.store.getPreferences();
-      const updated = { ...current, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) };
-      await deps.store.putPreferences(updated);
-      return { content: [{ type: "text", text: "Preferences saved." }], structuredContent: { preferences: updated } };
+      try {
+        const current = await deps.store.getPreferences();
+        const updated = { ...current, ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) };
+        await deps.store.putPreferences(updated);
+        return { content: [{ type: "text", text: copy.preferencesSaved }], structuredContent: { preferences: updated } };
+      } catch (err) {
+        return safeError("update_preferences", err);
+      }
     }
   );
 
@@ -171,19 +205,41 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
 
   server.tool(
     "daily_briefing",
-    "Give the customer a summary of what is due, upcoming, or flagged.",
-    {},
-    async () => {
-      const [due, flagged, objects] = await Promise.all([
-        deps.store.listItems("due"),
-        deps.store.listItems("flagged"),
-        deps.store.listObjects()
-      ]);
-      const summary =
-        due.length + flagged.length + objects.length > 0
-          ? `You have ${due.length} due, ${flagged.length} flagged.`
-          : "Nothing needs your attention today.";
-      return { content: [{ type: "text", text: summary }], structuredContent: { due, flagged, objects } };
+    "Give the customer a summary of what is due, upcoming, or flagged, plus saved object reminders.",
+    { date: z.string().optional() },
+    async ({ date }) => {
+      let due: Item[];
+      let appointments: Item[];
+      let flagged: Item[];
+      let objectReminders: Awaited<ReturnType<Store["listObjects"]>>;
+      try {
+        const reference = (date ?? new Date().toISOString()).slice(0, 10);
+        const [unresolved, flaggedItems, objects] = await Promise.all([
+          deps.store.listItems("unresolved"),
+          deps.store.listItems("flagged"),
+          deps.store.listObjects()
+        ]);
+        due = unresolved.filter((i) => i.fields.dueDate !== undefined && i.fields.dueDate <= reference);
+        appointments = unresolved
+          .filter((i) => i.class === "appointment" && i.fields.appointmentAt !== undefined)
+          .sort((a, b) => a.fields.appointmentAt!.localeCompare(b.fields.appointmentAt!));
+        flagged = flaggedItems;
+        objectReminders = objects;
+      } catch (err) {
+        return safeError("daily_briefing", err);
+      }
+
+      const parts: string[] = [];
+      if (due.length) parts.push(copy.briefing.due(due.length));
+      if (appointments.length) parts.push(copy.briefing.appointments(appointments.length));
+      if (flagged.length) parts.push(copy.briefing.flagged(flagged.length));
+      if (objectReminders.length) parts.push(copy.briefing.reminders(objectReminders.length));
+      const summary = parts.length ? copy.briefing.summary(parts) : copy.briefing.clear;
+
+      return {
+        content: [{ type: "text", text: summary }],
+        structuredContent: { due, appointments, flagged, objectReminders }
+      };
     }
   );
 
