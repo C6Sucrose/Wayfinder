@@ -6,6 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createFileStore } from "../src/storage/fileStore.js";
 import { buildServer } from "../src/mcp/server.js";
+import { APP_RESOURCE_URI } from "../src/mcp/appResource.js";
 import { copy } from "../src/domain/copy.js";
 import type { Item } from "../src/domain/model.js";
 
@@ -156,14 +157,14 @@ describe("update_preferences", () => {
 });
 
 describe("resources and prompt", () => {
-  it("lists both resources and reads the inbox", async () => {
+  it("lists the app, inbox, and objects resources and reads the inbox", async () => {
     const { client, store } = await connect();
     await store.putItem({
       itemId: "itm_i", scanId: "scn_x", class: "bill", confidence: 0.8, readAloudText: "bill",
       fields: {}, proposedActions: [], createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null
     });
     const list = await client.listResources();
-    expect(list.resources.map((r) => r.uri).sort()).toEqual(["wayfinder://inbox", "wayfinder://objects"]);
+    expect(list.resources.map((r) => r.uri).sort()).toEqual([APP_RESOURCE_URI, "wayfinder://inbox", "wayfinder://objects"]);
     const read = await client.readResource({ uri: "wayfinder://inbox" });
     expect(JSON.stringify(read.contents)).toContain("itm_i");
     await client.close();
