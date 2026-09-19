@@ -17,7 +17,6 @@ export function createScanWorker(deps: {
 }): ScanWorker {
   const limit = Math.max(1, deps.concurrency ?? 1);
   const queue: Array<{ scanId: string; imageRefs: string[]; hint: Scan["hint"] }> = [];
-  const running = new Set<string>();
   let active = 0;
   let closed = false;
   let drainResolvers: Array<() => void> = [];
@@ -31,20 +30,27 @@ export function createScanWorker(deps: {
 
   const run = async (task: { scanId: string; imageRefs: string[]; hint: Scan["hint"] }) => {
     active += 1;
-    running.add(task.scanId);
     try {
       const texts = deps.extract ? await deps.extract(task.imageRefs, task.hint) : [];
       await processScan(deps.store, task.scanId, texts);
     } catch (err) {
       console.error(`[scanWorker] scan ${task.scanId} failed:`, err);
-      const scan = await deps.store.getScan(task.scanId).catch(() => null);
-      if (scan) await deps.store.putScan({ ...scan, status: "failed" }).catch(() => undefined);
+      try {
+        const scan = await deps.store.getScan(task.scanId);
+        if (scan) await deps.store.putScan({ ...scan, status: "failed" });
+      } catch (recoveryErr) {
+        console.error(`[scanWorker] failed to record failure for scan ${task.scanId}:`, recoveryErr);
+      }
     } finally {
-      running.delete(task.scanId);
       active -= 1;
-      deps.onComplete?.(task.scanId);
-      pump();
-      settleIfIdle();
+      try {
+        deps.onComplete?.(task.scanId);
+      } catch (err) {
+        console.error("[scanWorker] onComplete failed:", err);
+      } finally {
+        pump();
+        settleIfIdle();
+      }
     }
   };
 
