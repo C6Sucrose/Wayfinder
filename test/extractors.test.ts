@@ -22,3 +22,38 @@ describe("extractFields", () => {
     expect(f.maskedAccount).toBe("••••3000");
   });
 });
+
+describe("amount normalization", () => {
+  it("parses US comma-thousands with a dot decimal", () => {
+    expect(extractFields("Amount due: $1,234.56", "bill").amount).toEqual({ value: 1234.56, currency: "USD" });
+  });
+
+  it("parses EU dot-thousands with a comma decimal", () => {
+    expect(extractFields("Amount due: €1.234,56", "bill").amount).toEqual({ value: 1234.56, currency: "EUR" });
+  });
+
+  it("parses comma-thousands without a decimal", () => {
+    expect(extractFields("Amount due: $1,234", "bill").amount).toEqual({ value: 1234, currency: "USD" });
+  });
+});
+
+describe("account masking safety", () => {
+  it("detects and masks a lowercase IBAN", () => {
+    const f = extractFields("Account de89370400440532013000", "bill");
+    expect(f.maskedAccount).toBe("••••3000");
+  });
+
+  it("never exposes a raw IBAN in any field, including reference", () => {
+    const raw = "DE89370400440532013000";
+    const f = extractFields(`Reference ${raw}`, "bill");
+    expect(JSON.stringify(f)).not.toContain(raw);
+    expect(f.reference).toBe("••••3000");
+  });
+
+  it("does not fully expose short account inputs", () => {
+    expect(maskAccount("1234")).toBe("••••34");
+    expect(maskAccount("123")).toBe("••••23");
+    expect(maskAccount("12")).toBe("••••");
+    expect(maskAccount("")).toBe("••••");
+  });
+});
