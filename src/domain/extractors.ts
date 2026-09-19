@@ -6,8 +6,19 @@ const MONTHS: Record<string, string> = {
 };
 
 export function maskAccount(raw: string): string {
-  const tail = raw.replace(/\s+/g, "").slice(-4);
-  return `••••${tail}`;
+  const clean = raw.replace(/\s+/g, "");
+  if (clean.length < 5) {
+    return clean.length > 2 ? `••••${clean.slice(-2)}` : "••••";
+  }
+  return `••••${clean.slice(-4)}`;
+}
+
+const IBAN_SHAPE = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{10,}$/;
+
+function normalizeAmount(raw: string): number {
+  const decimal = raw.match(/[.,](\d{2})$/);
+  const integerPart = (decimal ? raw.slice(0, raw.length - 3) : raw).replace(/[.,]/g, "");
+  return Number(decimal ? `${integerPart}.${decimal[1]}` : integerPart);
 }
 
 function isoDate(text: string): string | undefined {
@@ -29,9 +40,8 @@ function time24(text: string): string | undefined {
 function amount(text: string): Fields["amount"] {
   const sym = text.match(/[€$£]\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/);
   if (sym) {
-    const raw = sym[1]!.replace(/\.(?=\d{3}\b)/g, "").replace(",", ".");
     const currency = text.includes("€") ? "EUR" : text.includes("£") ? "GBP" : "USD";
-    return { value: Number(raw), currency };
+    return { value: normalizeAmount(sym[1]!), currency };
   }
   return undefined;
 }
@@ -46,9 +56,12 @@ export function extractFields(text: string, cls: DocClass): Fields {
   }
   const amt = amount(text);
   if (amt) fields.amount = amt;
-  const iban = text.match(/\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/);
+  const iban = text.match(/\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/i);
   if (iban) fields.maskedAccount = maskAccount(iban[0]);
-  const ref = text.match(/\b(?:ref|reference|kundennummer|customer no\.?)\s*[:#]?\s*([A-Z0-9-]{4,})/i);
-  if (ref) fields.reference = ref[1]!;
+  const ref = text.match(/\b(?:reference|kundennummer|customer no\.?|ref)\s*[:#]?\s*([A-Z0-9-]{4,})/i);
+  if (ref) {
+    const value = ref[1]!;
+    fields.reference = IBAN_SHAPE.test(value) ? maskAccount(value) : value;
+  }
   return fields;
 }
