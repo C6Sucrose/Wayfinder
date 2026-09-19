@@ -4,6 +4,7 @@ import type { Store } from "../storage/types.js";
 import { runScan, type Extractor } from "../domain/scanPipeline.js";
 import { copy } from "../domain/copy.js";
 import { rememberObject, findObject } from "../domain/objectMemory.js";
+import { applyAction } from "../domain/applyAction.js";
 
 export function buildServer(deps: { store: Store; extract?: Extractor }): McpServer {
   const server = new McpServer({ name: "wayfinder", version: "0.1.0" });
@@ -69,6 +70,27 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     async ({ name, locationNote, imageRef }) => {
       const obj = await rememberObject(deps.store, imageRef ? { name, locationNote, imageRef } : { name, locationNote });
       return { content: [{ type: "text", text: `Saved ${obj.name}.` }], structuredContent: { object: obj } };
+    }
+  );
+
+  server.tool(
+    "act_on_item",
+    "Carry out one of the suggested actions for an item after the customer confirms it.",
+    { itemId: z.string(), actionId: z.string() },
+    async ({ itemId, actionId }) => {
+      try {
+        const result = await applyAction(deps.store, itemId, actionId);
+        return {
+          content: [{ type: "text", text: result.message }],
+          structuredContent: { action: result.action, item: result.item }
+        };
+      } catch (err) {
+        console.error("[act_on_item] failed:", err);
+        return {
+          content: [{ type: "text", text: "I couldn't do that — please choose the action again." }],
+          isError: true
+        };
+      }
     }
   );
 
