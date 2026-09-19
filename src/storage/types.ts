@@ -5,6 +5,7 @@ export interface Store {
   getScan(id: string): Promise<Scan | null>;
   putItem(i: Item): Promise<void>;
   getItem(id: string): Promise<Item | null>;
+  deleteItem(id: string): Promise<void>;
   listItems(filter: "unresolved" | "due" | "flagged" | "all"): Promise<Item[]>;
   putAction(a: Action): Promise<void>;
   listActions(itemId: string): Promise<Action[]>;
