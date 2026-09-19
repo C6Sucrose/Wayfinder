@@ -15,6 +15,7 @@ const HOST_CAPABILITIES: McpUiHostCapabilities = { openLinks: {}, serverTools: {
 
 export function createAppHost(deps: { mount: HTMLElement }): {
   handleToolCalls(calls: AppHostCall[]): Promise<void>;
+  reset(): void;
 } {
   const client = new Client(HOST_INFO);
   let connected: Promise<void> | undefined;
@@ -34,6 +35,7 @@ export function createAppHost(deps: { mount: HTMLElement }): {
   let uiToolNames: string[] | undefined;
   let pendingInput: Record<string, unknown> = {};
   let pendingResult: CallToolResult | undefined;
+  let initialized = false;
 
   async function listTools(): Promise<Tool[]> {
     await ensure();
@@ -49,8 +51,15 @@ export function createAppHost(deps: { mount: HTMLElement }): {
     return uiToolNames;
   }
 
-  function pushToView(): void {
-    if (!bridge || !pendingResult) return;
+  function discardView(): void {
+    void bridge?.close();
+    bridge = undefined;
+    iframe = undefined;
+    initialized = false;
+  }
+
+  function sendPending(): void {
+    if (!bridge || !pendingResult || !initialized) return;
     void bridge.sendToolInput({ arguments: pendingInput });
     void bridge.sendToolResult(pendingResult);
   }
@@ -58,9 +67,7 @@ export function createAppHost(deps: { mount: HTMLElement }): {
   async function render(name: string, input: Record<string, unknown>, result: CallToolResult): Promise<void> {
     if (iframe && !deps.mount.contains(iframe)) {
       // The shell cleared the mount (Reset): drop the detached View and build a fresh one.
-      void bridge?.close();
-      iframe = undefined;
-      bridge = undefined;
+      discardView();
     }
 
     const tools = await listTools();
@@ -76,30 +83,46 @@ export function createAppHost(deps: { mount: HTMLElement }): {
       frame.title = "Wayfinder view";
       frame.setAttribute("sandbox", "allow-scripts");
       frame.style.cssText = "width:100%;border:0;border-radius:12px;background:transparent;";
+      deps.mount.replaceChildren(frame);
       const frameWindow = frame.contentWindow;
       if (!frameWindow) return;
-      deps.mount.replaceChildren(frame);
-      iframe = frame;
 
       const hostBridge = new AppBridge(client, HOST_INFO, HOST_CAPABILITIES, {
         hostContext: { toolInfo: { tool } }
       });
-      bridge = hostBridge;
       hostBridge.onsizechange = ({ height }) => {
         if (typeof height === "number") frame.style.height = `${height}px`;
       };
-      hostBridge.oninitialized = () => pushToView();
-      await hostBridge.connect(new PostMessageTransport(frameWindow, frameWindow));
+      hostBridge.oninitialized = () => {
+        initialized = true;
+        sendPending();
+      };
 
-      const read = await client.readResource({ uri });
-      const content = read.contents[0];
-      frame.srcdoc = content && "text" in content ? content.text : "";
+      let html = "";
+      try {
+        await hostBridge.connect(new PostMessageTransport(frameWindow, frameWindow));
+        const read = await client.readResource({ uri });
+        const content = read.contents[0];
+        if (content && "text" in content) html = content.text;
+      } catch (err) {
+        console.error("[host] failed to load the app view:", err);
+      }
+
+      if (!html) {
+        void hostBridge.close();
+        frame.remove();
+        return;
+      }
+
+      frame.srcdoc = html;
+      iframe = frame;
+      bridge = hostBridge;
       return;
     }
 
     if (bridge) {
       bridge.setHostContext({ toolInfo: { tool } });
-      pushToView();
+      sendPending();
     }
   }
 
@@ -113,6 +136,9 @@ export function createAppHost(deps: { mount: HTMLElement }): {
         CallToolResultSchema
       );
       await render(uiCall.name, uiCall.input, result);
+    },
+    reset(): void {
+      discardView();
     }
   };
 }
