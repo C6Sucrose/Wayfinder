@@ -19,6 +19,7 @@ export function scoreScam(text: string, signals: Signals): ScamResult {
   if (corroboratedPayment) { score += 0.3; reasons.push("requests a payment in a suspicious context"); }
   if (signals.hasQrOrLink) { score += 0.15; reasons.push("includes a link or QR code"); }
   if (signals.senderMismatch) { score += 0.25; reasons.push("sender does not match the claimed organisation"); }
+  if (signals.genericSalutation) { score += 0.15; reasons.push("uses a generic greeting often seen in scam mail"); }
   if (urgent) { score += 0.2; reasons.push("uses urgency or threats"); }
   if (gift) { score += 0.3; reasons.push("asks for gift-card payment"); }
   score = Math.round(Math.min(1, score) * 100) / 100;
