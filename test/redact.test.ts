@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { redactSensitive } from "../src/domain/redact.js";
+import { redactSensitive, maskAccount } from "../src/domain/redact.js";
 
 describe("redactSensitive", () => {
   it("masks an IBAN-shaped token embedded in text", () => {
@@ -40,5 +40,23 @@ describe("redactSensitive grouped formats", () => {
   it("leaves ordinary dates and amounts untouched", () => {
     expect(redactSensitive("due 2026-10-01 total €84.20")).toBe("due 2026-10-01 total €84.20");
     expect(redactSensitive("appointment 2026 10 12")).toBe("appointment 2026 10 12");
+  });
+});
+
+describe("redactSensitive irregular separators", () => {
+  it("masks a multi-space grouped card number", () => {
+    expect(redactSensitive("card 4111  1111  1111  1111")).toBe("card ••••1111");
+  });
+  it("masks a tab-separated card number", () => {
+    expect(redactSensitive("card 4111\t1111\t1111\t1111")).toBe("card ••••1111");
+  });
+  it("masks a non-breaking-space separated card number", () => {
+    expect(redactSensitive("card 4111\u00a01111\u00a01111\u00a01111")).toBe("card ••••1111");
+  });
+  it("masks a multi-space grouped IBAN", () => {
+    expect(redactSensitive("IBAN DE89  3704  0044  0532  0130  00")).toBe("IBAN ••••3000");
+  });
+  it("strips separators in maskAccount so dashed leftovers cannot leak", () => {
+    expect(maskAccount("1234-5678-9012")).toBe("••••9012");
   });
 });
