@@ -67,6 +67,7 @@ largeText.addEventListener("click", () => setLargeText(largeText.getAttribute("a
 
 const resetButton = document.getElementById("reset") as HTMLButtonElement;
 resetButton.addEventListener("click", () => {
+  host.reset();
   transcript.replaceChildren();
   events.textContent = "";
   brain.textContent = "rules";
