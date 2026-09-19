@@ -49,4 +49,32 @@ describe("scan worker", () => {
     expect((await store.getScan(scan.scanId))?.status).toBe("failed");
     await worker.close();
   });
+
+  it("drains queued scans on close without an intervening idle", async () => {
+    const completed: string[] = [];
+    const worker = createScanWorker({
+      store,
+      extract: async () => ["Amount due: €10. Payment due 2026-10-01."],
+      onComplete: (id) => { completed.push(id); }
+    });
+    const first = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const second = await createScan(store, { imageRefs: ["b"], hint: "mail" });
+    worker.enqueue({ scanId: first.scanId, imageRefs: ["a"], hint: "mail" });
+    worker.enqueue({ scanId: second.scanId, imageRefs: ["b"], hint: "mail" });
+    await worker.close();
+    const statuses = await Promise.all(
+      [first, second].map(async (s) => (await store.getScan(s.scanId))?.status)
+    );
+    expect(statuses).toEqual(["ready", "ready"]);
+    expect(completed).toEqual([first.scanId, second.scanId]);
+  }, 15000);
+
+  it("rejects enqueue after close", async () => {
+    const worker = createScanWorker({ store });
+    await worker.close();
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    expect(() => worker.enqueue({ scanId: scan.scanId, imageRefs: ["a"], hint: "mail" })).toThrow(
+      "Worker is closed."
+    );
+  });
 });

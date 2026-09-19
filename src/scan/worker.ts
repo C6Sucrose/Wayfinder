@@ -56,19 +56,21 @@ export function createScanWorker(deps: {
     }
   };
 
+  const idle = (): Promise<void> => {
+    if (active === 0 && queue.length === 0) return Promise.resolve();
+    return new Promise<void>((resolve) => { drainResolvers.push(resolve); });
+  };
+
   return {
     enqueue(input) {
       if (closed) throw new Error("Worker is closed.");
       queue.push(input);
       pump();
     },
-    idle() {
-      if (active === 0 && queue.length === 0) return Promise.resolve();
-      return new Promise<void>((resolve) => { drainResolvers.push(resolve); });
-    },
+    idle,
     async close() {
+      await idle();
       closed = true;
-      await this.idle();
     }
   };
 }
