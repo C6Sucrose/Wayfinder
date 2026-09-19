@@ -10,6 +10,8 @@ export const copy = {
   savedObject: (name: string) => `Saved ${name}.`,
   preferencesSaved: "Preferences saved.",
   toolFailed: "I couldn't do that — please choose the action again.",
+  toolUnavailable: "I couldn't get that just now. Please try again.",
+  invalidDate: "I couldn't understand that date. Please give me a calendar date.",
   actions: {
     alreadyDone: "That's already done.",
     remind: "I'll remind you about that.",
@@ -30,5 +32,9 @@ export const copy = {
   disclaimers: {
     label:
       "This is the text on the label, not medical advice. Consult a healthcare provider for personal decisions.",
+  },
+  prompts: {
+    morningBriefing:
+      "Give me my morning briefing: what is due, what appointments are coming, and anything flagged.",
   },
 } as const;

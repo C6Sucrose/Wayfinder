@@ -12,10 +12,10 @@ import type { Item } from "../domain/model.js";
 export function buildServer(deps: { store: Store; extract?: Extractor }): McpServer {
   const server = new McpServer({ name: "wayfinder", version: "0.1.0" });
 
-  const safeError = (tool: string, err: unknown) => {
+  const safeError = (tool: string, err: unknown, message: string = copy.toolUnavailable) => {
     console.error(`[${tool}] failed:`, err);
     return {
-      content: [{ type: "text" as const, text: copy.toolFailed }],
+      content: [{ type: "text" as const, text: message }],
       isError: true as const
     };
   };
@@ -114,7 +114,7 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
           structuredContent: { action: result.action, item: result.item }
         };
       } catch (err) {
-        return safeError("act_on_item", err);
+        return safeError("act_on_item", err, copy.toolFailed);
       }
     }
   );
@@ -197,7 +197,7 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
       }
       const parsed = parseLabel(labelText);
       return {
-        content: [{ type: "text", text: `${parsed.name}. ${parsed.disclaimer}` }],
+        content: [{ type: "text", text: `${parsed.labelText} ${parsed.disclaimer}` }],
         structuredContent: parsed
       };
     }
@@ -208,6 +208,9 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     "Give the customer a summary of what is due, upcoming, or flagged, plus saved object reminders.",
     { date: z.string().optional() },
     async ({ date }) => {
+      if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return { content: [{ type: "text", text: copy.invalidDate }], isError: true as const };
+      }
       let due: Item[];
       let appointments: Item[];
       let flagged: Item[];
@@ -272,7 +275,7 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
           role: "user",
           content: {
             type: "text",
-            text: "Give me my morning briefing: what is due, what appointments are coming, and anything flagged."
+            text: copy.prompts.morningBriefing
           }
         }
       ]
