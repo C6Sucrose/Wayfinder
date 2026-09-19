@@ -187,5 +187,41 @@ export function buildServer(deps: { store: Store; extract?: Extractor }): McpSer
     }
   );
 
+  server.resource(
+    "inbox",
+    "wayfinder://inbox",
+    { description: "The customer's unresolved items." },
+    async (uri) => {
+      const items = await deps.store.listItems("unresolved");
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify({ items }) }] };
+    }
+  );
+
+  server.resource(
+    "objects",
+    "wayfinder://objects",
+    { description: "Remembered household objects and their last-seen locations." },
+    async (uri) => {
+      const objects = await deps.store.listObjects();
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify({ objects }) }] };
+    }
+  );
+
+  server.prompt(
+    "morning_briefing",
+    "Start the day by summarizing what needs the customer's attention.",
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: "Give me my morning briefing: what is due, what appointments are coming, and anything flagged."
+          }
+        }
+      ]
+    })
+  );
+
   return server;
 }

@@ -52,3 +52,27 @@ describe("update_preferences", () => {
     await client.close();
   });
 });
+
+describe("resources and prompt", () => {
+  it("lists both resources and reads the inbox", async () => {
+    const { client, store } = await connect();
+    await store.putItem({
+      itemId: "itm_i", scanId: "scn_x", class: "bill", confidence: 0.8, readAloudText: "bill",
+      fields: {}, proposedActions: [], createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null
+    });
+    const list = await client.listResources();
+    expect(list.resources.map((r) => r.uri).sort()).toEqual(["wayfinder://inbox", "wayfinder://objects"]);
+    const read = await client.readResource({ uri: "wayfinder://inbox" });
+    expect(JSON.stringify(read.contents)).toContain("itm_i");
+    await client.close();
+  });
+
+  it("exposes the morning_briefing prompt", async () => {
+    const { client } = await connect();
+    const prompts = await client.listPrompts();
+    expect(prompts.prompts.map((p) => p.name)).toContain("morning_briefing");
+    const got = await client.getPrompt({ name: "morning_briefing" });
+    expect(got.messages.length).toBeGreaterThan(0);
+    await client.close();
+  });
+});
