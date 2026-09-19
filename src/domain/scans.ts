@@ -25,7 +25,27 @@ export async function createScan(store: Store, input: { imageRefs: string[]; hin
   return scan;
 }
 
-export async function processScan(store: Store, scanId: string, texts: string[]): Promise<Scan> {
+const inFlight = new WeakMap<Store, Map<string, Promise<Scan>>>();
+
+export function processScan(store: Store, scanId: string, texts: string[]): Promise<Scan> {
+  let byScan = inFlight.get(store);
+  if (!byScan) {
+    byScan = new Map();
+    inFlight.set(store, byScan);
+  }
+  const existing = byScan.get(scanId);
+  if (existing) return existing;
+
+  // Coalesce concurrent callers for the same scan: the terminal-state check is
+  // not an atomic claim, so a second run could pass it before the first writes.
+  const tracked = runProcessScan(store, scanId, texts).finally(() => {
+    if (byScan.get(scanId) === tracked) byScan.delete(scanId);
+  });
+  byScan.set(scanId, tracked);
+  return tracked;
+}
+
+async function runProcessScan(store: Store, scanId: string, texts: string[]): Promise<Scan> {
   const scan = await store.getScan(scanId);
   if (!scan) throw new Error("Unknown scan.");
   // Already terminal: return as-is so an at-least-once retry cannot duplicate items.

@@ -18,11 +18,13 @@ export function createBedrockExtractor(deps: {
   client: BedrockConverseLike;
   modelId: string;
   maxTokens?: number;
+  allowedRoot?: string;
 }): Extractor {
   return async (imageRefs) => {
     const texts: string[] = [];
+    const options = deps.allowedRoot !== undefined ? { root: deps.allowedRoot } : undefined;
     for (const ref of imageRefs) {
-      const image = await loadImage(ref);
+      const image = await loadImage(ref, options);
       const response = (await deps.client.send({
         modelId: deps.modelId,
         messages: [

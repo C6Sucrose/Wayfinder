@@ -5,6 +5,7 @@ import { processScan } from "../domain/scans.js";
 
 export interface ScanWorker {
   enqueue(input: { scanId: string; imageRefs: string[]; hint: Scan["hint"] }): void;
+  isFull(): boolean;
   idle(): Promise<void>;
   close(): Promise<void>;
 }
@@ -14,12 +15,16 @@ export function createScanWorker(deps: {
   extract?: Extractor;
   onComplete?: (scanId: string) => void;
   concurrency?: number;
+  maxQueue?: number;
 }): ScanWorker {
   const limit = Math.max(1, deps.concurrency ?? 1);
+  const maxQueue = Math.max(1, deps.maxQueue ?? 100);
   const queue: Array<{ scanId: string; imageRefs: string[]; hint: Scan["hint"] }> = [];
   let active = 0;
   let closed = false;
   let drainResolvers: Array<() => void> = [];
+
+  const isFull = () => active + queue.length >= maxQueue;
 
   const settleIfIdle = () => {
     if (active === 0 && queue.length === 0) {
@@ -70,9 +75,11 @@ export function createScanWorker(deps: {
   return {
     enqueue(input) {
       if (closed) throw new Error("Worker is closed.");
+      if (isFull()) throw new Error("Worker queue is full.");
       queue.push(input);
       pump();
     },
+    isFull,
     idle,
     async close() {
       await idle();

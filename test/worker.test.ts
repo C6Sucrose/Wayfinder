@@ -69,6 +69,29 @@ describe("scan worker", () => {
     expect(completed).toEqual([first.scanId, second.scanId]);
   }, 15000);
 
+  it("reports capacity and rejects enqueue beyond maxQueue while a task is active", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const worker = createScanWorker({
+      store,
+      maxQueue: 1,
+      extract: async () => { await gate; return ["Amount due: €10. Payment due 2026-10-01."]; }
+    });
+    const first = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const second = await createScan(store, { imageRefs: ["b"], hint: "mail" });
+    expect(worker.isFull()).toBe(false);
+    worker.enqueue({ scanId: first.scanId, imageRefs: ["a"], hint: "mail" });
+    expect(worker.isFull()).toBe(true);
+    expect(() => worker.enqueue({ scanId: second.scanId, imageRefs: ["b"], hint: "mail" })).toThrow(
+      "Worker queue is full."
+    );
+    release();
+    await worker.idle();
+    expect(worker.isFull()).toBe(false);
+    expect((await store.getScan(first.scanId))?.status).toBe("ready");
+    await worker.close();
+  });
+
   it("rejects enqueue after close", async () => {
     const worker = createScanWorker({ store });
     await worker.close();
