@@ -1,4 +1,4 @@
-import type { Scan, Item, Action, StoredObject, Preferences } from "../domain/model.js";
+import type { Scan, Item, Action, StoredObject, Preferences, LedgerEntry } from "../domain/model.js";
 
 export interface Store {
   putScan(s: Scan): Promise<void>;
@@ -13,4 +13,6 @@ export interface Store {
   listObjects(): Promise<StoredObject[]>;
   getPreferences(): Promise<Preferences>;
   putPreferences(p: Preferences): Promise<void>;
+  listLedger(): Promise<LedgerEntry[]>;
+  putLedgerEntry(e: LedgerEntry): Promise<void>;
 }
