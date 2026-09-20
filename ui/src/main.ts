@@ -1,36 +1,55 @@
 import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
-import { renderScreen, type ScreenInput } from "./screens.js";
+import { renderConfirm, renderScreen, type ScreenInput } from "./screens.js";
 import { toolNameFromHostContext } from "./hostContext.js";
 
 const app = new App({ name: "wayfinder-view", version: "0.1.0" });
 const root = document.getElementById("root") as HTMLElement;
 let current: ScreenInput = { toolName: "", arguments: {} };
+let pendingAction: { itemId: string; actionId: string; type: string } | undefined;
 
 function paint(): void {
-  root.innerHTML = renderScreen(current);
+  root.innerHTML = renderScreen(current) + (pendingAction ? renderConfirm(pendingAction) : "");
   wireActions();
+  wireConfirm();
   // Report height so the host can size the iframe.
   void app.sendSizeChanged({ height: document.documentElement.scrollHeight });
 }
 
 function wireActions(): void {
   root.querySelectorAll<HTMLButtonElement>("button.action").forEach((button) => {
-    button.addEventListener("click", () => void handleAction(button));
+    button.addEventListener("click", () => {
+      const itemId = button.dataset.itemId;
+      const actionId = button.dataset.actionId;
+      if (!itemId || !actionId) return;
+      pendingAction = { itemId, actionId, type: button.textContent ?? "" };
+      paint();
+    });
   });
 }
 
-async function handleAction(button: HTMLButtonElement): Promise<void> {
-  const itemId = button.dataset.itemId;
-  const actionId = button.dataset.actionId;
-  if (!itemId || !actionId) return;
-  if (!window.confirm("Carry out this action?")) return;
+function wireConfirm(): void {
+  root.querySelector<HTMLButtonElement>(".confirm__no")?.addEventListener("click", () => {
+    pendingAction = undefined;
+    paint();
+  });
+  const yes = root.querySelector<HTMLButtonElement>(".confirm__yes");
+  if (yes) yes.addEventListener("click", () => void confirmAction(yes));
+}
+
+async function confirmAction(button: HTMLButtonElement): Promise<void> {
+  const pending = pendingAction;
+  if (!pending) return;
   button.disabled = true;
   try {
-    const res = await app.callServerTool({ name: "act_on_item", arguments: { itemId, actionId } });
+    const res = await app.callServerTool({
+      name: "act_on_item",
+      arguments: { itemId: pending.itemId, actionId: pending.actionId }
+    });
+    pendingAction = undefined;
     current = { ...current, toolName: "act_on_item", result: res.structuredContent };
   } catch (err) {
     console.error("[view] action failed:", err);
-    return;
+    pendingAction = undefined;
   } finally {
     button.disabled = false;
   }

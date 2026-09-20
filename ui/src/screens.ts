@@ -28,6 +28,10 @@ function itemCard(item: Record<string, unknown>): string {
   return card(`${cls}${due ? ` · due ${due}` : ""}`, `<p>${text}</p>${actions}`, tone);
 }
 
+export function renderConfirm(action: { actionId: string; type: string }): string {
+  return `<section class="confirm" role="alertdialog" aria-label="Confirm action"><p>Carry out <strong>${escape(action.type)}</strong>?</p><div class="confirm__actions"><button type="button" class="confirm__yes" data-action-id="${escape(action.actionId)}">Yes</button><button type="button" class="confirm__no">Cancel</button></div></section>`;
+}
+
 export function renderScreen(input: ScreenInput): string {
   const result = (input.result ?? {}) as Record<string, unknown>;
   const items = Array.isArray(result.items) ? (result.items as Array<Record<string, unknown>>) : [];

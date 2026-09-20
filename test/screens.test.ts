@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderScreen } from "../ui/src/screens.js";
+import { renderConfirm, renderScreen } from "../ui/src/screens.js";
 
 describe("renderScreen: lists and scans", () => {
   const scamItem = {
@@ -38,6 +38,20 @@ describe("renderScreen: lists and scans", () => {
     expect(html).not.toContain("<ul");
   });
 
+  it("escapes hostile item and action ids in the data attributes", () => {
+    const hostile = {
+      itemId: 'a"><img src=x>',
+      class: "bill",
+      readAloudText: "A bill",
+      proposedActions: [{ actionId: "'><script>alert(1)</script>", type: "Pay" }]
+    };
+    const html = renderScreen({ toolName: "list_items", arguments: {}, result: { items: [hostile] } });
+    expect(html).toContain('data-item-id="a&quot;&gt;&lt;img src=x&gt;"');
+    expect(html).toContain('data-action-id="&#39;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"');
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<script>");
+  });
+
   it("renders an empty state when there are no items", () => {
     const html = renderScreen({ toolName: "list_items", arguments: {}, result: { items: [] } });
     expect(html).toBe('<p class="empty">Nothing to show yet.</p>');
@@ -60,8 +74,8 @@ describe("renderScreen: get_item", () => {
       arguments: {},
       result: { item: { itemId: "i1", class: "label", readAloudText: "Milk" } }
     });
-    expect(html).toContain("label");
-    expect(html).toContain("Milk");
+    expect(html).toContain("<h2>label</h2>");
+    expect(html).toContain("<p>Milk</p>");
   });
 
   it("renders an empty state when the item is absent", () => {
@@ -152,6 +166,23 @@ describe("renderScreen: act_on_item", () => {
     expect(html).toContain("Pay · done");
     expect(html).toContain("card--info");
     expect(html).toContain("Paid &lt;bill&gt;");
+  });
+});
+
+describe("renderConfirm", () => {
+  it("renders exact Yes and Cancel buttons with the action id", () => {
+    const html = renderConfirm({ actionId: "report", type: "Report" });
+    expect(html).toContain('<button type="button" class="confirm__yes" data-action-id="report">Yes</button>');
+    expect(html).toContain('<button type="button" class="confirm__no">Cancel</button>');
+    expect(html).toContain('<section class="confirm" role="alertdialog" aria-label="Confirm action">');
+    expect(html).toContain("Carry out <strong>Report</strong>?");
+  });
+
+  it("escapes a hostile action type and action id", () => {
+    const html = renderConfirm({ actionId: '\'><img src=x onerror=alert(1)>', type: "<img src=x onerror=alert(1)>" });
+    expect(html).toContain("Carry out <strong>&lt;img src=x onerror=alert(1)&gt;</strong>?");
+    expect(html).toContain('data-action-id="&#39;&gt;&lt;img src=x onerror=alert(1)&gt;"');
+    expect(html).not.toContain("<img");
   });
 });
 
