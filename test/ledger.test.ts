@@ -32,6 +32,20 @@ describe("appendLedgerEntry", () => {
     expect(JSON.stringify(entry.details)).not.toContain("DE89370400440532013000");
   });
 
+  it("redacts nested object and array details before hashing and leaves numbers untouched", () => {
+    const entry = appendLedgerEntry([], {
+      ...base,
+      entryId: "e1",
+      event: "ingested",
+      details: { payment: { iban: "DE89370400440532013000" }, refs: ["DE89370400440532013000"], amount: 84.2 }
+    });
+    const serialized = JSON.stringify(entry.details);
+    expect(serialized).not.toContain("DE89370400440532013000");
+    expect(serialized).toContain("••••3000");
+    expect(entry.details.amount).toBe(84.2);
+    expect(verifyLedger([entry])).toEqual({ ok: true, entries: 1 });
+  });
+
   it("does not mutate the input array", () => {
     const entries = chain();
     const before = entries.length;
