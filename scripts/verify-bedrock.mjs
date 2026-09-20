@@ -3,9 +3,12 @@
  * Verify Amazon Bedrock is ready for Wayfinder (text brain + multimodal reader).
  *
  * Usage:
- *   set BEDROCK_MODEL_ID=us.anthropic.claude-...   (PowerShell: $env:BEDROCK_MODEL_ID="...")
- *   set AWS_REGION=us-east-1
- *   node scripts/verify-bedrock.mjs
+ *   PowerShell:
+ *     $env:BEDROCK_MODEL_ID="us.anthropic.claude-..."; $env:AWS_REGION="us-east-1"
+ *     node scripts/verify-bedrock.mjs
+ *   bash / zsh:
+ *     export BEDROCK_MODEL_ID="us.anthropic.claude-..."; export AWS_REGION="us-east-1"
+ *     node scripts/verify-bedrock.mjs
  *
  * Requires AWS credentials in the default chain (env vars or ~/.aws/credentials).
  */
@@ -71,7 +74,7 @@ async function visionProbe() {
 if (!modelId) {
   console.error("BEDROCK_MODEL_ID is not set.");
   console.error("Pick a Claude inference profile, e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0");
-  console.error("List options with: aws bedrock list-inference-profiles --region us-east-1");
+  console.error(`List options with: aws bedrock list-inference-profiles --region ${region}`);
   process.exit(2);
 }
 
@@ -94,4 +97,5 @@ try {
 
 console.log("\nBedrock is ready: text and multimodal both work.");
 console.log("Start the server with:");
-console.log(`  $env:BEDROCK_MODEL_ID="${modelId}"; $env:AWS_REGION="${region}"; npm start`);
+console.log(`  PowerShell: $env:BEDROCK_MODEL_ID="${modelId}"; $env:AWS_REGION="${region}"; npm start`);
+console.log(`  bash/zsh:   BEDROCK_MODEL_ID="${modelId}" AWS_REGION="${region}" npm start`);
