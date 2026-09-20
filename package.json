@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.test.json && tsc -p ui/tsconfig.json",
     "lint": "eslint .",
+    "verify:bedrock": "node scripts/verify-bedrock.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {
