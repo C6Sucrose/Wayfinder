@@ -70,9 +70,9 @@ describe("evaluateAuthority", () => {
   it("refuses a low-confidence action when the policy is refuse", () => {
     expect(evaluateAuthority({ actionType: "file", record: record("low"), authority: { ...authority, onLowConfidence: "refuse" } }).decision).toBe("refuse");
   });
-  it("refuses with an escalation reason when the policy is escalate", () => {
+  it("escalates a low-confidence action when the policy is escalate", () => {
     const result = evaluateAuthority({ actionType: "file", record: record("low"), authority: { ...authority, onLowConfidence: "escalate" } });
-    expect(result.decision).toBe("refuse");
+    expect(result.decision).toBe("escalate");
     expect(result.reason.toLowerCase()).toContain("trusted contact");
   });
   it("allows a high-confidence non-forbidden action with no amount", () => {
