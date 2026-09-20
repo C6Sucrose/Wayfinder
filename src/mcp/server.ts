@@ -11,6 +11,9 @@ import { rememberObject, findObject } from "../domain/objectMemory.js";
 import { applyAction } from "../domain/applyAction.js";
 import { parseLabel } from "../domain/labelParser.js";
 import { redactSensitive } from "../domain/redact.js";
+import { buildBacklog, describeThread, type BacklogEntry } from "../domain/backlog.js";
+import { createLedger } from "../domain/ledgerLog.js";
+import { buildRecordReport, verifyLedger } from "../domain/ledger.js";
 import type { Item } from "../domain/model.js";
 
 export interface ServerDeps {
@@ -211,6 +214,87 @@ export function buildServer(deps: ServerDeps): McpServer {
   );
 
   server.tool(
+    "get_backlog",
+    "Rank what needs attention by urgency, with outstanding demands and related documents.",
+    { date: z.string().optional() },
+    async ({ date }) => {
+      if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return { content: [{ type: "text", text: copy.invalidDate }], isError: true as const };
+      }
+      let backlog: BacklogEntry[];
+      try {
+        backlog = await buildBacklog(deps.store, date ? new Date(`${date}T12:00:00.000Z`) : new Date());
+      } catch (err) {
+        return safeError("get_backlog", err);
+      }
+      const outstanding = backlog.filter((e) => e.thread.outstanding);
+      const text = outstanding.length === 0
+        ? copy.backlog.empty
+        : copy.backlog.summary(outstanding.length, describeThread(outstanding[0]!.thread, outstanding[0]!.deadline));
+      return { content: [{ type: "text", text }], structuredContent: { backlog } };
+    }
+  );
+
+  server.tool(
+    "get_audit",
+    "Explain what happened to a document or thread, from the record.",
+    { documentId: z.string().optional(), threadKey: z.string().optional() },
+    async ({ documentId, threadKey }) => {
+      if (documentId === undefined && threadKey === undefined) {
+        return { content: [{ type: "text", text: copy.audit.empty }], structuredContent: { entries: [] } };
+      }
+      let entries: Awaited<ReturnType<ReturnType<typeof createLedger>["read"]>>;
+      try {
+        entries = (await createLedger(deps.store).read()).filter(
+          (e) => (documentId === undefined || e.documentId === documentId)
+            && (threadKey === undefined || e.threadKey === threadKey)
+        );
+      } catch (err) {
+        return safeError("get_audit", err);
+      }
+      const text = entries.length === 0 ? copy.audit.empty : entries.map((e) => e.event).join(", ");
+      return { content: [{ type: "text", text }], structuredContent: { entries } };
+    }
+  );
+
+  server.tool(
+    "verify_ledger",
+    "Prove the record has not been altered since it was written.",
+    {},
+    async () => {
+      try {
+        const entries = await createLedger(deps.store).read();
+        const result = verifyLedger(entries);
+        const terminal = entries[entries.length - 1]?.hash ?? "0".repeat(64);
+        const text = result.ok
+          ? copy.ledger.verified(result.entries, terminal)
+          : copy.ledger.tampered(result.firstMismatchSeq ?? 1);
+        return { content: [{ type: "text", text }], structuredContent: { ...result, terminal } };
+      } catch (err) {
+        return safeError("verify_ledger", err);
+      }
+    }
+  );
+
+  server.tool(
+    "export_record",
+    "Produce a voice-friendly report of what the system saw and did, over a period.",
+    { from: z.string().optional(), to: z.string().optional() },
+    async ({ from, to }) => {
+      try {
+        const range = {
+          ...(from !== undefined ? { from } : {}),
+          ...(to !== undefined ? { to } : {})
+        };
+        const report = buildRecordReport(await createLedger(deps.store).read(), range);
+        return { content: [{ type: "text", text: report }], structuredContent: { report } };
+      } catch (err) {
+        return safeError("export_record", err);
+      }
+    }
+  );
+
+  server.tool(
     "update_preferences",
     "Update the customer's preferences such as verbosity or trusted contact.",
     {
@@ -277,12 +361,14 @@ export function buildServer(deps: ServerDeps): McpServer {
       let appointments: Item[];
       let flagged: Item[];
       let objectReminders: Awaited<ReturnType<Store["listObjects"]>>;
+      let backlog: BacklogEntry[];
       try {
         const reference = (date ?? new Date().toISOString()).slice(0, 10);
-        const [unresolved, flaggedItems, objects] = await Promise.all([
+        const [unresolved, flaggedItems, objects, ranked] = await Promise.all([
           deps.store.listItems("unresolved"),
           deps.store.listItems("flagged"),
-          deps.store.listObjects()
+          deps.store.listObjects(),
+          buildBacklog(deps.store, new Date(`${reference}T12:00:00.000Z`))
         ]);
         due = unresolved.filter((i) => i.fields.dueDate !== undefined && i.fields.dueDate <= reference);
         appointments = unresolved
@@ -290,6 +376,7 @@ export function buildServer(deps: ServerDeps): McpServer {
           .sort((a, b) => a.fields.appointmentAt!.localeCompare(b.fields.appointmentAt!));
         flagged = flaggedItems;
         objectReminders = objects;
+        backlog = ranked;
       } catch (err) {
         return safeError("daily_briefing", err);
       }
@@ -300,10 +387,14 @@ export function buildServer(deps: ServerDeps): McpServer {
       if (flagged.length) parts.push(copy.briefing.flagged(flagged.length));
       if (objectReminders.length) parts.push(copy.briefing.reminders(objectReminders.length));
       const summary = parts.length ? copy.briefing.summary(parts) : copy.briefing.clear;
+      const outstanding = backlog.filter((e) => e.thread.outstanding);
+      const lead = outstanding.length
+        ? `${copy.backlog.summary(outstanding.length, describeThread(outstanding[0]!.thread, outstanding[0]!.deadline))} `
+        : "";
 
       return {
-        content: [{ type: "text", text: summary }],
-        structuredContent: { due, appointments, flagged, objectReminders }
+        content: [{ type: "text", text: `${lead}${summary}` }],
+        structuredContent: { due, appointments, flagged, objectReminders, backlog }
       };
     }
   );
@@ -325,6 +416,22 @@ export function buildServer(deps: ServerDeps): McpServer {
     async (uri) => {
       const objects = await deps.store.listObjects();
       return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify({ objects }) }] };
+    }
+  );
+
+  server.resource(
+    "ledger",
+    "wayfinder://ledger",
+    { description: "The tamper-evident record of what the system saw and did." },
+    async (uri) => {
+      const entries = await createLedger(deps.store).read();
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify({ entries, verification: verifyLedger(entries) })
+        }]
+      };
     }
   );
 
