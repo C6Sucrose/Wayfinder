@@ -18,7 +18,11 @@ function sortValue(value: unknown): unknown {
 }
 
 export function canonicalJSON(value: unknown): string {
-  return JSON.stringify(sortValue(value));
+  const result: string | undefined = JSON.stringify(sortValue(value));
+  if (result === undefined) {
+    throw new TypeError("canonicalJSON: value has no JSON representation");
+  }
+  return result;
 }
 
 export function hashEntry(prevHash: string, entry: Omit<LedgerEntry, "hash">): string {
@@ -86,11 +90,35 @@ export function verifyLedger(entries: LedgerEntry[]): { ok: boolean; entries: nu
   return { ok: true, entries: entries.length };
 }
 
+function flattenDetail(value: unknown, prefix: string, out: string[]): void {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    out.push(`${prefix}: ${String(value)}`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => flattenDetail(item, `${prefix} ${index + 1}`, out));
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      flattenDetail(nested, prefix ? `${prefix} ${key}` : key, out);
+    }
+  }
+}
+
+function describeDetails(details: Record<string, unknown>): string {
+  const out: string[] = [];
+  for (const [key, value] of Object.entries(details)) {
+    flattenDetail(value, key, out);
+  }
+  return out.join("; ");
+}
+
 export function buildRecordReport(entries: LedgerEntry[], range: { from?: string; to?: string }): string {
   const inRange = entries.filter((e) => (!range.from || e.at >= range.from) && (!range.to || e.at <= range.to));
   const lines = inRange.map((e) => {
-    const target = e.documentId ?? e.threadKey ?? "";
-    return `- ${e.at} ${e.event} ${target} ${canonicalJSON(e.details)}`;
+    const detail = describeDetails(e.details);
+    return `- ${e.at} ${e.event}${detail ? ` — ${detail}` : ""}`;
   });
   const terminal = entries[entries.length - 1]?.hash ?? GENESIS;
   return [
@@ -100,6 +128,6 @@ export function buildRecordReport(entries: LedgerEntry[], range: { from?: string
     ...lines,
     "",
     `Terminal hash: ${terminal}`,
-    "Verify: run verify_ledger. This proves the record is internally consistent and unaltered; it is not a legal attestation."
+    "This shows what I saw and did, and that the record has not changed since. It is not a legal attestation."
   ].join("\n");
 }

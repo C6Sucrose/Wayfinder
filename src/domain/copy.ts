@@ -31,6 +31,15 @@ export const copy = {
     reminders: (n: number) => `${n} reminder(s)`,
     summary: (parts: string[]) => `You have ${parts.join(", ")}.`,
   },
+  authority: {
+    forbidden: (kind: string) => `You have not allowed me to ${kind.replace(/_/g, " ")}.`,
+    currencyConfirm: (amountCurrency: string, confirmCurrency: string, autoCurrency: string) =>
+      `This amount is in ${amountCurrency} but your limits are in ${confirmCurrency} and ${autoCurrency}, so I need you to confirm it.`,
+    amountConfirm: "This is above the amount I can act on without asking.",
+    lowConfidenceRefuse: "I can't read this reliably, so I won't act on it.",
+    lowConfidenceEscalate: "I can't read this reliably; I'll ask your trusted contact to help.",
+    lowConfidenceConfirm: "I'm not certain I read this correctly — please confirm.",
+  },
   disclaimers: {
     label:
       "This is the text on the label, not medical advice. Consult a healthcare provider for personal decisions.",
