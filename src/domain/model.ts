@@ -90,11 +90,22 @@ export const StoredObjectSchema = z.object({
 });
 export type StoredObject = z.infer<typeof StoredObjectSchema>;
 
+export const AuthoritySchema = z.object({
+  autoActUpTo: z.object({ currency: z.string(), value: z.number().nonnegative() }),
+  confirmAbove: z.object({ currency: z.string(), value: z.number().nonnegative() }),
+  forbidden: z.array(z.enum(["make_payment", "share_personal_data", "delete_document", "discard_document"])),
+  onLowConfidence: z.enum(["ask", "refuse", "escalate"])
+}).refine((a) => a.confirmAbove.value <= a.autoActUpTo.value, {
+  message: "confirmAbove must not exceed autoActUpTo"
+});
+export type Authority = z.infer<typeof AuthoritySchema>;
+
 export const PreferencesSchema = z.object({
   verbosity: z.enum(["brief", "normal", "detailed"]).default("normal"),
   trustedContactAlias: z.string().nullable().default(null),
   largeText: z.boolean().default(false),
-  locale: z.string().default("en-US")
+  locale: z.string().default("en-US"),
+  authority: AuthoritySchema.optional()
 });
 export type Preferences = z.infer<typeof PreferencesSchema>;
 
@@ -130,13 +141,3 @@ export const ThreadSchema = z.object({
   outstanding: z.boolean()
 });
 export type Thread = z.infer<typeof ThreadSchema>;
-
-export const AuthoritySchema = z.object({
-  autoActUpTo: z.object({ currency: z.string(), value: z.number().nonnegative() }),
-  confirmAbove: z.object({ currency: z.string(), value: z.number().nonnegative() }),
-  forbidden: z.array(z.enum(["make_payment", "share_personal_data", "delete_document", "discard_document"])),
-  onLowConfidence: z.enum(["ask", "refuse", "escalate"])
-}).refine((a) => a.confirmAbove.value <= a.autoActUpTo.value, {
-  message: "confirmAbove must not exceed autoActUpTo"
-});
-export type Authority = z.infer<typeof AuthoritySchema>;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { kindFor, evaluateAuthority } from "../src/domain/authority.js";
+import { copy } from "../src/domain/copy.js";
 import type { Authority, DocumentRecord } from "../src/domain/model.js";
 
 const authority: Authority = {
@@ -42,6 +43,10 @@ describe("evaluateAuthority", () => {
     const result = evaluateAuthority({ actionType: "share", amount: { currency: "EUR", value: 1 }, record: record(), authority });
     expect(result.decision).toBe("refuse");
     expect(result.reason.length).toBeGreaterThan(0);
+  });
+  it("sources spoken reasons from the shared copy module", () => {
+    const result = evaluateAuthority({ actionType: "share", record: record(), authority });
+    expect(result.reason).toBe(copy.authority.forbidden("share_personal_data"));
   });
   it("confirms a low-confidence action when the policy is ask", () => {
     expect(evaluateAuthority({ actionType: "file", record: record("low"), authority }).decision).toBe("confirm");

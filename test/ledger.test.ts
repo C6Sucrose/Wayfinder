@@ -16,6 +16,11 @@ describe("canonicalJSON", () => {
   it("sorts keys recursively and emits no whitespace", () => {
     expect(canonicalJSON({ b: 1, a: { d: 2, c: 3 } })).toBe('{"a":{"c":3,"d":2},"b":1}');
   });
+
+  it("throws on a value with no JSON representation instead of returning undefined", () => {
+    expect(() => canonicalJSON(undefined)).toThrow();
+    expect(() => canonicalJSON(() => 0)).toThrow();
+  });
 });
 
 describe("golden vectors", () => {
@@ -110,5 +115,15 @@ describe("buildRecordReport", () => {
     const entries = chain();
     const report = buildRecordReport(entries, { from: "2026-09-20T12:00:00.000Z", to: "2026-09-20T12:00:00.000Z" });
     expect(report.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(3);
+  });
+
+  it("renders a voice-friendly report with no IDs, JSON, or tool names", () => {
+    const entries = chain();
+    const report = buildRecordReport(entries, {});
+    expect(report).not.toContain("itm_1");
+    expect(report).not.toContain("{");
+    expect(report).not.toContain("}");
+    expect(report.toLowerCase()).not.toContain("verify_ledger");
+    expect(report).toContain("sender: City Water");
   });
 });

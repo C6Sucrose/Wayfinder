@@ -12,12 +12,26 @@ export function ibanIsValid(raw: string): boolean {
   return remainder === 1;
 }
 
+const DATE_PREFIX = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/;
+
 export function datePlausible(
   iso: string,
   now: Date,
   options?: { pastDays?: number; futureDays?: number }
 ): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return false;
+  const match = DATE_PREFIX.exec(iso);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (
+    calendar.getUTCFullYear() !== year ||
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day
+  ) {
+    return false;
+  }
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return false;
   const pastDays = options?.pastDays ?? 30;

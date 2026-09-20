@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ItemSchema, ActionSchema, LedgerEntrySchema, DocumentStateSchema } from "../src/domain/model.js";
+import { ItemSchema, ActionSchema, LedgerEntrySchema, DocumentStateSchema, PreferencesSchema } from "../src/domain/model.js";
 
 describe("domain model", () => {
   it("accepts a valid item", () => {
@@ -67,5 +67,32 @@ describe("v2 model extensions", () => {
 
   it("requires a hash chain link on a ledger entry", () => {
     expect(() => LedgerEntrySchema.parse({ seq: 1, entryId: "e1", at: "2026-09-20T00:00:00.000Z", actor: "agent", event: "ingested", details: {} })).toThrow();
+  });
+
+  it("defaults authority away for legacy preferences and persists a configured envelope", () => {
+    expect(PreferencesSchema.parse({}).authority).toBeUndefined();
+    const configured = PreferencesSchema.parse({
+      authority: {
+        autoActUpTo: { currency: "EUR", value: 100 },
+        confirmAbove: { currency: "EUR", value: 50 },
+        forbidden: ["delete_document"],
+        onLowConfidence: "refuse"
+      }
+    });
+    expect(configured.authority?.onLowConfidence).toBe("refuse");
+    expect(configured.authority?.forbidden).toEqual(["delete_document"]);
+  });
+
+  it("rejects a persisted envelope whose confirmAbove exceeds autoActUpTo", () => {
+    expect(() =>
+      PreferencesSchema.parse({
+        authority: {
+          autoActUpTo: { currency: "EUR", value: 10 },
+          confirmAbove: { currency: "EUR", value: 50 },
+          forbidden: [],
+          onLowConfidence: "ask"
+        }
+      })
+    ).toThrow();
   });
 });

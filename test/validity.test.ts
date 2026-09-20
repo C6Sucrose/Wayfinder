@@ -32,6 +32,14 @@ describe("datePlausible", () => {
   it("rejects a non-ISO string", () => {
     expect(datePlausible("not-a-date", now)).toBe(false);
   });
+  it("rejects a non-existent calendar day that JavaScript would otherwise normalize", () => {
+    expect(datePlausible("2026-09-31", now)).toBe(false);
+    expect(datePlausible("2026-02-30", now)).toBe(false);
+    expect(datePlausible("2026-13-01", now)).toBe(false);
+  });
+  it("still accepts a valid ISO datetime", () => {
+    expect(datePlausible("2026-10-01T09:00:00.000Z", now)).toBe(true);
+  });
 });
 
 describe("amountSane", () => {
