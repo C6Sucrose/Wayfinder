@@ -4,7 +4,7 @@ import { AppBridge, PostMessageTransport, getToolUiResourceUri } from "@modelcon
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { McpUiHostCapabilities } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { pickUiTool } from "./uiTools.js";
+import { pickUiTool, scanIsIncomplete } from "./uiTools.js";
 
 export { pickUiTool };
 
@@ -36,6 +36,8 @@ export function createAppHost(deps: { mount: HTMLElement }): {
   let pendingInput: Record<string, unknown> = {};
   let pendingResult: CallToolResult | undefined;
   let initialized = false;
+  let generation = 0;
+  let chain: Promise<void> = Promise.resolve();
 
   async function listTools(): Promise<Tool[]> {
     await ensure();
@@ -64,13 +66,14 @@ export function createAppHost(deps: { mount: HTMLElement }): {
     void bridge.sendToolResult(pendingResult);
   }
 
-  async function render(name: string, input: Record<string, unknown>, result: CallToolResult): Promise<void> {
+  async function render(name: string, input: Record<string, unknown>, result: CallToolResult, gen: number): Promise<void> {
     if (iframe && !deps.mount.contains(iframe)) {
       // The shell cleared the mount (Reset): drop the detached View and build a fresh one.
       discardView();
     }
 
     const tools = await listTools();
+    if (gen !== generation) return;
     const tool = tools.find((t) => t.name === name);
     const uri = tool ? getToolUiResourceUri(tool) : undefined;
     if (!tool || !uri) return;
@@ -101,7 +104,17 @@ export function createAppHost(deps: { mount: HTMLElement }): {
       let html = "";
       try {
         await hostBridge.connect(new PostMessageTransport(frameWindow, frameWindow));
+        if (gen !== generation) {
+          void hostBridge.close();
+          frame.remove();
+          return;
+        }
         const read = await client.readResource({ uri });
+        if (gen !== generation) {
+          void hostBridge.close();
+          frame.remove();
+          return;
+        }
         const content = read.contents[0];
         if (content && "text" in content) html = content.text;
       } catch (err) {
@@ -113,6 +126,11 @@ export function createAppHost(deps: { mount: HTMLElement }): {
         frame.remove();
         return;
       }
+      if (gen !== generation) {
+        void hostBridge.close();
+        frame.remove();
+        return;
+      }
 
       frame.srcdoc = html;
       iframe = frame;
@@ -120,24 +138,55 @@ export function createAppHost(deps: { mount: HTMLElement }): {
       return;
     }
 
+    if (gen !== generation) return;
     if (bridge) {
       bridge.setHostContext({ toolInfo: { tool } });
       sendPending();
     }
   }
 
+  async function callTool(name: string, input: Record<string, unknown>): Promise<CallToolResult> {
+    return client.request(
+      { method: "tools/call", params: { name, arguments: input } },
+      CallToolResultSchema
+    );
+  }
+
+  async function doHandle(calls: AppHostCall[]): Promise<void> {
+    const gen = generation;
+    const uiCall = pickUiTool(calls, await derivedUiTools());
+    if (!uiCall) return;
+    if (gen !== generation) return;
+
+    await ensure();
+    if (gen !== generation) return;
+
+    let result = await callTool(uiCall.name, uiCall.input);
+    if (gen !== generation) return;
+
+    if (uiCall.name === "get_scan" && scanIsIncomplete(result)) {
+      const scanId = uiCall.input.scanId;
+      if (typeof scanId === "string") {
+        for (let i = 0; i < 15 && scanIsIncomplete(result); i++) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+          if (gen !== generation) return;
+          result = await callTool("get_scan", { scanId });
+          if (gen !== generation) return;
+        }
+      }
+    }
+
+    await render(uiCall.name, uiCall.input, result, gen);
+  }
+
   return {
-    async handleToolCalls(calls: AppHostCall[]): Promise<void> {
-      const uiCall = pickUiTool(calls, await derivedUiTools());
-      if (!uiCall) return;
-      await ensure();
-      const result = await client.request(
-        { method: "tools/call", params: { name: uiCall.name, arguments: uiCall.input } },
-        CallToolResultSchema
-      );
-      await render(uiCall.name, uiCall.input, result);
+    handleToolCalls(calls: AppHostCall[]): Promise<void> {
+      const run = chain.then(() => doHandle(calls));
+      chain = run.catch(() => {});
+      return run;
     },
     reset(): void {
+      generation += 1;
       discardView();
     }
   };

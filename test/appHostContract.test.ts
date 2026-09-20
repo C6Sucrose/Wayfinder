@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickUiTool } from "../web/src/uiTools.js";
+import { pickUiTool, scanIsIncomplete } from "../web/src/uiTools.js";
 import { toolNameFromHostContext } from "../ui/src/hostContext.js";
 
 describe("pickUiTool", () => {
@@ -9,6 +9,25 @@ describe("pickUiTool", () => {
   });
   it("returns undefined when no call has a UI", () => {
     expect(pickUiTool([{ name: "capture_scan" }], ui)).toBeUndefined();
+  });
+});
+
+describe("scanIsIncomplete", () => {
+  it("is true for queued and analyzing scans", () => {
+    expect(scanIsIncomplete({ structuredContent: { status: "queued" } })).toBe(true);
+    expect(scanIsIncomplete({ structuredContent: { status: "analyzing" } })).toBe(true);
+  });
+  it("is false for ready and failed scans", () => {
+    expect(scanIsIncomplete({ structuredContent: { status: "ready" } })).toBe(false);
+    expect(scanIsIncomplete({ structuredContent: { status: "failed" } })).toBe(false);
+  });
+  it("is false for missing, undefined, or non-object payloads", () => {
+    expect(scanIsIncomplete(undefined)).toBe(false);
+    expect(scanIsIncomplete(null)).toBe(false);
+    expect(scanIsIncomplete("queued")).toBe(false);
+    expect(scanIsIncomplete({})).toBe(false);
+    expect(scanIsIncomplete({ structuredContent: null })).toBe(false);
+    expect(scanIsIncomplete({ structuredContent: "queued" })).toBe(false);
   });
 });
 
