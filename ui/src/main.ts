@@ -8,8 +8,33 @@ let current: ScreenInput = { toolName: "", arguments: {} };
 
 function paint(): void {
   root.innerHTML = renderScreen(current);
+  wireActions();
   // Report height so the host can size the iframe.
   void app.sendSizeChanged({ height: document.documentElement.scrollHeight });
+}
+
+function wireActions(): void {
+  root.querySelectorAll<HTMLButtonElement>("button.action").forEach((button) => {
+    button.addEventListener("click", () => void handleAction(button));
+  });
+}
+
+async function handleAction(button: HTMLButtonElement): Promise<void> {
+  const itemId = button.dataset.itemId;
+  const actionId = button.dataset.actionId;
+  if (!itemId || !actionId) return;
+  if (!window.confirm("Carry out this action?")) return;
+  button.disabled = true;
+  try {
+    const res = await app.callServerTool({ name: "act_on_item", arguments: { itemId, actionId } });
+    current = { ...current, toolName: "act_on_item", result: res.structuredContent };
+  } catch (err) {
+    console.error("[view] action failed:", err);
+    return;
+  } finally {
+    button.disabled = false;
+  }
+  paint();
 }
 
 function applyHostContext(context: unknown): void {

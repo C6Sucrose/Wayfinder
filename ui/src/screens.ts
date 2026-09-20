@@ -21,9 +21,9 @@ function itemCard(item: Record<string, unknown>): string {
     : "";
   const tone = cls === "scam" ? "alert" : cls === "label" ? "info" : "";
   const actions = Array.isArray(item.proposedActions)
-    ? `<ul class="actions">${(item.proposedActions as Array<Record<string, unknown>>)
-        .map((a) => `<li>${escape(a.type)}</li>`)
-        .join("")}</ul>`
+    ? `<div class="actions">${(item.proposedActions as Array<Record<string, unknown>>)
+        .map((a) => `<button type="button" class="action" data-item-id="${escape(item.itemId)}" data-action-id="${escape(a.actionId)}">${escape(a.type)}</button>`)
+        .join("")}</div>`
     : "";
   return card(`${cls}${due ? ` · due ${due}` : ""}`, `<p>${text}</p>${actions}`, tone);
 }
@@ -44,10 +44,18 @@ export function renderScreen(input: ScreenInput): string {
       const due = Array.isArray(result.due) ? result.due.length : 0;
       const flagged = Array.isArray(result.flagged) ? result.flagged.length : 0;
       const appts = Array.isArray(result.appointments) ? result.appointments.length : 0;
-      return `<section class="grid">${card("Due", `<p class="big">${due}</p>`)}${card("Appointments", `<p class="big">${appts}</p>`)}${card("Flagged", `<p class="big">${flagged}</p>`, flagged ? "alert" : "")}</section>`;
+      const reminders = Array.isArray(result.objectReminders) ? result.objectReminders.length : 0;
+      return `<section class="grid">${card("Due", `<p class="big">${due}</p>`)}${card("Appointments", `<p class="big">${appts}</p>`)}${card("Flagged", `<p class="big">${flagged}</p>`, flagged ? "alert" : "")}${card("Reminders", `<p class="big">${reminders}</p>`, reminders ? "info" : "")}</section>`;
     }
     case "identify_product":
+      if (result.available === false || !result.labelText) return `<p class="empty">I couldn't read that label.</p>`;
       return card(String(result.name ?? "Label"), `<pre class="label">${escape(result.labelText ?? "")}</pre><p class="disclaimer">${escape(result.disclaimer ?? "")}</p>`);
+    case "act_on_item": {
+      const action = (result.action ?? {}) as Record<string, unknown>;
+      const item = (result.item ?? {}) as Record<string, unknown>;
+      const status = action.status ? ` · ${action.status}` : "";
+      return card(`${String(action.type ?? "Done")}${status}`, `<p>${escape(item.readAloudText ?? "")}</p>`, "info");
+    }
     case "find_object": {
       const found = result.found as Record<string, unknown> | null | undefined;
       return found
