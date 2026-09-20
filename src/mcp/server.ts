@@ -13,6 +13,7 @@ import { parseLabel } from "../domain/labelParser.js";
 import { redactSensitive } from "../domain/redact.js";
 import { buildBacklog, describeThread, type BacklogEntry } from "../domain/backlog.js";
 import { createLedger } from "../domain/ledgerLog.js";
+import { withLifecycle } from "../domain/lifecycle.js";
 import { buildRecordReport, verifyLedger } from "../domain/ledger.js";
 import type { Item } from "../domain/model.js";
 
@@ -290,6 +291,42 @@ export function buildServer(deps: ServerDeps): McpServer {
         return { content: [{ type: "text", text: report }], structuredContent: { report } };
       } catch (err) {
         return safeError("export_record", err);
+      }
+    }
+  );
+
+  server.tool(
+    "escalate_item",
+    "Hand an item the customer can't resolve to their trusted contact.",
+    { documentId: z.string().optional(), threadKey: z.string().optional(), reason: z.string().optional() },
+    async ({ documentId, threadKey, reason }) => {
+      if (documentId === undefined && threadKey === undefined) {
+        return { content: [{ type: "text", text: copy.escalateTarget }], isError: true as const };
+      }
+      try {
+        const preferences = await deps.store.getPreferences();
+        if (!preferences.trustedContactAlias) {
+          return { content: [{ type: "text", text: copy.noTrustedContact }], isError: true as const };
+        }
+        const at = new Date().toISOString();
+        if (documentId !== undefined) {
+          const item = await deps.store.getItem(documentId);
+          if (item) await deps.store.putItem(withLifecycle(item, "escalated", at));
+        }
+        await createLedger(deps.store).append({
+          at,
+          actor: "user",
+          event: "escalated",
+          ...(documentId !== undefined ? { documentId } : {}),
+          ...(threadKey !== undefined ? { threadKey } : {}),
+          ...(reason !== undefined ? { details: { reason } } : {})
+        });
+        return {
+          content: [{ type: "text", text: copy.escalated(preferences.trustedContactAlias) }],
+          structuredContent: { escalated: true }
+        };
+      } catch (err) {
+        return safeError("escalate_item", err);
       }
     }
   );
