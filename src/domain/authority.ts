@@ -19,6 +19,11 @@ export function evaluateAuthority(input: {
 }): { decision: "allow" | "confirm" | "refuse"; reason: string } {
   const { actionType, amount, record, authority } = input;
 
+  const kind = kindFor(actionType);
+  if (kind !== "other" && authority.forbidden.includes(kind)) {
+    return { decision: "refuse", reason: `You have not allowed me to ${kind.replace(/_/g, " ")}.` };
+  }
+
   if (record.record.confidence === "low") {
     if (authority.onLowConfidence === "refuse") {
       return { decision: "refuse", reason: "I can't read this reliably, so I won't act on it." };
@@ -29,14 +34,9 @@ export function evaluateAuthority(input: {
     return { decision: "confirm", reason: "I'm not certain I read this correctly — please confirm." };
   }
 
-  const kind = kindFor(actionType);
-  if (kind !== "other" && authority.forbidden.includes(kind)) {
-    return { decision: "refuse", reason: `You have not allowed me to ${kind.replace(/_/g, " ")}.` };
-  }
-
   if (amount) {
-    if (amount.currency !== authority.confirmAbove.currency) {
-      return { decision: "confirm", reason: `This amount is in ${amount.currency} but your limits are in ${authority.confirmAbove.currency}, so I need you to confirm it.` };
+    if (amount.currency !== authority.confirmAbove.currency || amount.currency !== authority.autoActUpTo.currency) {
+      return { decision: "confirm", reason: `This amount is in ${amount.currency} but your limits are in ${authority.confirmAbove.currency} and ${authority.autoActUpTo.currency}, so I need you to confirm it.` };
     }
     if (amount.value >= authority.confirmAbove.value || amount.value > authority.autoActUpTo.value) {
       return { decision: "confirm", reason: "This is above the amount I can act on without asking." };
