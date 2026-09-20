@@ -311,7 +311,10 @@ export function buildServer(deps: ServerDeps): McpServer {
         const at = new Date().toISOString();
         if (documentId !== undefined) {
           const item = await deps.store.getItem(documentId);
-          if (item) await deps.store.putItem(withLifecycle(item, "escalated", at));
+          if (!item) {
+            return { content: [{ type: "text", text: copy.escalateUnknown }], isError: true as const };
+          }
+          await deps.store.putItem(withLifecycle(item, "escalated", at));
         }
         await createLedger(deps.store).append({
           at,

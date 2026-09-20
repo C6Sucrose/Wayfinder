@@ -92,21 +92,38 @@ export async function applyAction(
       break;
   }
 
+  await ledger.append({
+    at: now,
+    actor: verdict.decision === "allow" ? "agent" : "user",
+    event: "action_confirmed",
+    documentId: item.itemId,
+    threadKey: record.record.threadKey,
+    details: { actionType: action.type }
+  });
+
   const done: Action = { ...action, status: "done" };
   const updatedItem = withLifecycle(
     { ...item, proposedActions: item.proposedActions.map((a) => (a.actionId === action.actionId ? done : a)) },
     CLOSING_ACTIONS.has(action.type) ? "closed" : "action_taken",
     now
   );
-  await store.putItem(updatedItem);
-  await store.putAction(done);
-  await ledger.append({
-    at: now,
-    actor: "user",
-    event: "action_confirmed",
-    documentId: item.itemId,
-    threadKey: record.record.threadKey,
-    details: { actionType: action.type }
-  });
+  try {
+    await store.putItem(updatedItem);
+    await store.putAction(done);
+  } catch (err) {
+    try {
+      await ledger.append({
+        at: now,
+        actor: "agent",
+        event: "delivery_failed",
+        documentId: item.itemId,
+        threadKey: record.record.threadKey,
+        details: { actionType: action.type }
+      });
+    } catch (logErr) {
+      console.error("[applyAction] failed to record delivery_failed:", logErr);
+    }
+    throw err;
+  }
   return { item: updatedItem, action: done, message, decision: verdict.decision };
 }

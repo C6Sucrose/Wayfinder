@@ -158,4 +158,13 @@ describe("escalate_item", () => {
     expect((res.content as Array<{ text: string }>)[0]!.text).toBe(copy.escalateTarget);
     await client.close();
   });
+
+  it("reports an error when the document is unknown", async () => {
+    const { client, store } = await connect();
+    await store.putPreferences({ ...(await store.getPreferences()), trustedContactAlias: "Priya" });
+    const res = await client.callTool({ name: "escalate_item", arguments: { documentId: "itm_missing" } });
+    expect(res.isError).toBe(true);
+    expect((res.content as Array<{ text: string }>)[0]!.text).toBe(copy.escalateUnknown);
+    await client.close();
+  });
 });

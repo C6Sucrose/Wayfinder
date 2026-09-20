@@ -33,7 +33,9 @@ export async function buildBacklog(store: Store, now: Date): Promise<BacklogEntr
 
 export function describeThread(thread: Thread, deadline?: string): string {
   const who = thread.sender || "an unknown sender";
-  const what = thread.demandType === "none" ? "a document" : `a ${thread.demandType}`;
+  const what = thread.demandType === "none"
+    ? "a document"
+    : `${thread.demandType === "appointment" ? "an" : "a"} ${thread.demandType}`;
   const when = deadline !== undefined ? ` due ${deadline}` : "";
   const reminders = thread.reminderCount > 0 ? `, ${thread.reminderCount} reminder(s)` : "";
   return `${who}: ${what}${when}${reminders}`;

@@ -54,6 +54,7 @@ export const copy = {
   escalated: (alias: string) => `I've asked ${alias} to help with that.`,
   noTrustedContact: "I don't have a trusted contact set up.",
   escalateTarget: "Tell me which document or thread to escalate.",
+  escalateUnknown: "I don't have a record of that document.",
   disclaimers: {
     label:
       "This is the text on the label, not medical advice. Consult a healthcare provider for personal decisions.",
