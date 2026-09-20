@@ -148,13 +148,13 @@ export function buildServer(deps: ServerDeps): McpServer {
   server.tool(
     "act_on_item",
     "Carry out one of the suggested actions for an item after the customer confirms it.",
-    { itemId: z.string(), actionId: z.string() },
-    async ({ itemId, actionId }) => {
+    { itemId: z.string(), actionId: z.string(), confirmed: z.boolean().default(false) },
+    async ({ itemId, actionId, confirmed }) => {
       try {
-        const result = await applyAction(deps.store, itemId, actionId);
+        const result = await applyAction(deps.store, itemId, actionId, { confirmed });
         return {
           content: [{ type: "text", text: result.message }],
-          structuredContent: { action: result.action, item: result.item }
+          structuredContent: { action: result.action, item: result.item, decision: result.decision }
         };
       } catch (err) {
         return safeError("act_on_item", err, copy.toolFailed);
