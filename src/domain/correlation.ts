@@ -50,12 +50,10 @@ export function threadUrgency(
   now: Date
 ): Thread["urgency"] {
   if (!thread.outstanding) return "low";
-  if (deadline) {
-    const days = (new Date(deadline).getTime() - now.getTime()) / 86_400_000;
-    if (days <= 3) return "high";
-    if (days <= 14) return "medium";
-  }
+  const days = deadline ? (new Date(deadline).getTime() - now.getTime()) / 86_400_000 : undefined;
+  if (days !== undefined && days <= 3) return "high";
   if (thread.reminderCount >= 2) return "high";
+  if (days !== undefined && days <= 14) return "medium";
   return "low";
 }
 

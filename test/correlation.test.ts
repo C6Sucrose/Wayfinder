@@ -68,6 +68,9 @@ describe("threadUrgency", () => {
   it("is medium inside fourteen days", () => {
     expect(threadUrgency({ reminderCount: 0, outstanding: true }, "2026-10-01", now)).toBe("medium");
   });
+  it("is high for two reminders even when the deadline is beyond three days", () => {
+    expect(threadUrgency({ reminderCount: 2, outstanding: true }, "2026-09-25", now)).toBe("high");
+  });
   it("is low otherwise, and never high once closed", () => {
     expect(threadUrgency({ reminderCount: 0, outstanding: true }, "2027-01-01", now)).toBe("low");
     expect(threadUrgency({ reminderCount: 5, outstanding: false }, "2026-09-21", now)).not.toBe("high");

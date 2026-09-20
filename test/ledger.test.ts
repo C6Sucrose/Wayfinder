@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canonicalJSON, appendLedgerEntry, verifyLedger, buildRecordReport } from "../src/domain/ledger.js";
+import { canonicalJSON, hashEntry, appendLedgerEntry, verifyLedger, buildRecordReport } from "../src/domain/ledger.js";
 import type { LedgerEntry } from "../src/domain/model.js";
 
 const base = { entryId: "e", at: "2026-09-20T12:00:00.000Z", actor: "agent" as const };
@@ -15,6 +15,26 @@ function chain(): LedgerEntry[] {
 describe("canonicalJSON", () => {
   it("sorts keys recursively and emits no whitespace", () => {
     expect(canonicalJSON({ b: 1, a: { d: 2, c: 3 } })).toBe('{"a":{"c":3,"d":2},"b":1}');
+  });
+});
+
+describe("golden vectors", () => {
+  it("pins canonicalJSON for a fixed nested object", () => {
+    expect(canonicalJSON({ b: 1, a: { d: 2, c: 3 }, list: [{ y: 2, x: 1 }] })).toBe('{"a":{"c":3,"d":2},"b":1,"list":[{"x":1,"y":2}]}');
+  });
+
+  it("pins hashEntry for a fixed prevHash and entry", () => {
+    const prevHash = "ab".repeat(32);
+    const entry = {
+      seq: 1,
+      entryId: "e1",
+      at: "2026-09-20T12:00:00.000Z",
+      actor: "agent" as const,
+      event: "ingested" as const,
+      details: { sender: "City Water", amount: 42 },
+      prevHash
+    };
+    expect(hashEntry(prevHash, entry)).toBe("7cb9fde86a0529a1680bf3bc7d7ba99b07909c79e1fbb159f9f3afc286158bd8");
   });
 });
 

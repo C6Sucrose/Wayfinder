@@ -46,6 +46,22 @@ describe("evaluateAuthority", () => {
   it("confirms a low-confidence action when the policy is ask", () => {
     expect(evaluateAuthority({ actionType: "file", record: record("low"), authority }).decision).toBe("confirm");
   });
+  it("refuses a forbidden action even at low confidence with the ask policy", () => {
+    const result = evaluateAuthority({ actionType: "share", record: record("low"), authority });
+    expect(result.decision).toBe("refuse");
+    expect(result.reason.length).toBeGreaterThan(0);
+  });
+  it("confirms when the amount currency matches neither limit's currency", () => {
+    const splitCurrency: Authority = {
+      autoActUpTo: { currency: "USD", value: 100 },
+      confirmAbove: { currency: "EUR", value: 50 },
+      forbidden: [],
+      onLowConfidence: "ask"
+    };
+    const result = evaluateAuthority({ actionType: "remind", amount: { currency: "EUR", value: 20 }, record: record(), authority: splitCurrency });
+    expect(result.decision).toBe("confirm");
+    expect(result.reason.length).toBeGreaterThan(0);
+  });
   it("refuses a low-confidence action when the policy is refuse", () => {
     expect(evaluateAuthority({ actionType: "file", record: record("low"), authority: { ...authority, onLowConfidence: "refuse" } }).decision).toBe("refuse");
   });
