@@ -50,8 +50,9 @@ Each pillar is load-bearing; removing one breaks the thesis. Abstention protects
 
 1. **Append-only, hash-chained log.** Every event is an entry. `hash = SHA-256(prevHash + "\n" + canonicalJSON(entryWithoutHash))`, where `canonicalJSON` sorts keys and emits no whitespace. The genesis `prevHash` is 64 zeros.
 2. **Events:** `ingested`, `triaged`, `action_proposed`, `action_confirmed`, `action_refused`, `superseded`, `flag_raised`, `escalated`, `closed`.
-3. **Verification.** A pure `verifyLedger(entries)` recomputes the chain and returns `{ ok, entries, firstMismatchSeq? }`. It is exposed both as a test helper and as an MCP tool so the agent can prove its own record.
-4. **Export.** `buildRecordReport(entries, range)` produces a human-readable, voice-friendly situation report (Markdown) that includes the terminal chain hash, so a caregiver, advocate, bank, or ombudsman can verify it independently.
+3. **Redaction at write.** `LedgerEntry.details` is passed through `redactSensitive` (v1) **before** hashing, so account numbers never enter the chain in the clear. The chain commits to redacted content, and `export_record` inherits that guarantee.
+4. **Verification.** A pure `verifyLedger(entries)` recomputes the chain and returns `{ ok, entries, firstMismatchSeq? }`. It is exposed both as a test helper and as an MCP tool so the agent can prove its own record.
+5. **Export.** `buildRecordReport(entries, range)` produces a human-readable, voice-friendly situation report (Markdown) that includes the terminal chain hash, so a caregiver, advocate, bank, or ombudsman can verify it independently.
 
 **Explicit non-claim.** We do **not** claim third-party bank integration or legal evidentiary weight. The honest claim is: *the record is internally consistent and tamper-evident; it can prove what the system saw and did, and that it was not altered afterwards.* Confirmation is "recorded confirmation", and an unconfirmed action past its deadline is **escalated**, not silently assumed.
 
@@ -128,6 +129,8 @@ interface Thread {
 
 `Item` remains the persisted unit; `DocumentRecord` and `Thread` are derived views computed from items plus the ledger.
 
+**Authoritative state.** `lifecycle` is the authoritative state field. v1's `Item.resolvedAt` is retained only for compatibility and is set to a timestamp **exactly when** `lifecycle` first reaches `closed`; it must never be read to infer lifecycle. Any code that currently branches on `resolvedAt` moves to `lifecycle`.
+
 ---
 
 ## 4. Correlation rules (deterministic)
@@ -139,6 +142,8 @@ Cheap because v1's `extractors.ts` already yields `sender`, `reference`, and `am
 3. **Supersession:** supersession language (`replaces`, `correction`, `updated`, `supersedes`) links `supersedes`/`supersededBy` and closes the older document as `superseded`.
 4. **Urgency:** `high` if any demand deadline is within 3 days **or** (`reminderCount >= 2` **and** the thread is `outstanding`); `medium` if within 14 days; else `low`.
 5. **Duplicates:** identical `reference` + identical demand type within the thread are treated as one demand, not two.
+
+**Known limitation (accepted).** When `reference` is absent, two genuinely different obligations from the same sender with the same demand type (e.g. two unrelated invoices from one utility) will share a thread. This is a deliberate under-merge: conflation is visible and correctable by the user ("no, that's a different one"), whereas over-splitting would hide a real obligation, which is the more dangerous failure for this population. A future extractor signal (invoice number, period) can refine `threadKey` without changing the model.
 
 All five rules are pure functions with unit tests.
 
@@ -185,6 +190,7 @@ All five rules are pure functions with unit tests.
 | Source | Requirement | v2 treatment |
 |---|---|---|
 | §3 Policy | Minimal data, retention/deletion | Ledger retention is bounded and deletable; `export_record` redacts account numbers. |
+| §3 Policy + append-only | **Deletion vs tamper-evidence** | Deleting a document removes its stored content and appends a `closed` entry recording that the content was purged; the chain stays verifiable for everything that remains, and verification reports the purge rather than hiding it. |
 | §9 Policy | Attribute factual information | Unchanged; ledger `details` are system facts, not attributed claims. |
 | §14 Policy | Financial: no directive advice, explicit confirmation | The envelope **enforces** confirmation thresholds and records confirmations; still no advice and no payment instruments. |
 | §10 Policy | Not an LLM relay; real domain value | Strengthened: correlation, checksum validation, hash chain, and the policy engine are all deterministic domain logic. |
