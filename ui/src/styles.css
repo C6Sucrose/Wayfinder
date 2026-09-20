@@ -21,3 +21,8 @@ body { margin: 0; background: var(--wf-bg); color: var(--wf-fg); font: 16px/1.5 
 .empty { color: var(--wf-muted); }
 button, .actions button { min-height: 48px; }
 .action:focus-visible { outline: 2px solid var(--wf-accent); outline-offset: 2px; }
+.confirm { border: 1px solid var(--wf-accent); border-radius: var(--wf-radius); padding: 16px; margin-top: var(--wf-gap); background: var(--wf-info-bg); color: var(--wf-info-fg); }
+.confirm p { margin: 0 0 12px; }
+.confirm__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.confirm button { min-height: 48px; }
+.confirm button:focus-visible { outline: 2px solid var(--wf-accent); outline-offset: 2px; }

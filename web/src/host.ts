@@ -58,6 +58,8 @@ export function createAppHost(deps: { mount: HTMLElement }): {
     bridge = undefined;
     iframe = undefined;
     initialized = false;
+    pendingInput = {};
+    pendingResult = undefined;
   }
 
   function sendPending(): void {
@@ -152,8 +154,7 @@ export function createAppHost(deps: { mount: HTMLElement }): {
     );
   }
 
-  async function doHandle(calls: AppHostCall[]): Promise<void> {
-    const gen = generation;
+  async function doHandle(calls: AppHostCall[], gen: number): Promise<void> {
     const uiCall = pickUiTool(calls, await derivedUiTools());
     if (!uiCall) return;
     if (gen !== generation) return;
@@ -181,7 +182,8 @@ export function createAppHost(deps: { mount: HTMLElement }): {
 
   return {
     handleToolCalls(calls: AppHostCall[]): Promise<void> {
-      const run = chain.then(() => doHandle(calls));
+      const gen = generation;
+      const run = chain.then(() => doHandle(calls, gen));
       chain = run.catch(() => {});
       return run;
     },
