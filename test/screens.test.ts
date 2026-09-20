@@ -1,0 +1,201 @@
+import { describe, it, expect } from "vitest";
+import { renderConfirm, renderScreen } from "../ui/src/screens.js";
+
+describe("renderScreen: lists and scans", () => {
+  const scamItem = {
+    itemId: "s1",
+    class: "scam",
+    readAloudText: '<img src=x onerror=alert(1)>',
+    fields: { dueDate: "2026-01-05" },
+    proposedActions: [{ actionId: "report", type: "Report" }]
+  };
+
+  it("renders a grid with class/due title and alert tone for scams", () => {
+    const html = renderScreen({ toolName: "list_items", arguments: {}, result: { items: [scamItem] } });
+    expect(html).toContain('<section class="grid">');
+    expect(html).toContain("scam · due 2026-01-05");
+    expect(html).toContain("card--alert");
+  });
+
+  it("renders the same grid for get_scan", () => {
+    const html = renderScreen({ toolName: "get_scan", arguments: {}, result: { items: [scamItem] } });
+    expect(html).toContain('<section class="grid">');
+    expect(html).toContain("card--alert");
+  });
+
+  it("escapes hostile item text", () => {
+    const html = renderScreen({ toolName: "list_items", arguments: {}, result: { items: [scamItem] } });
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).not.toContain("<img src=x");
+  });
+
+  it("renders action buttons carrying item and action ids", () => {
+    const html = renderScreen({ toolName: "list_items", arguments: {}, result: { items: [scamItem] } });
+    expect(html).toContain('<button type="button" class="action"');
+    expect(html).toContain('data-item-id="s1"');
+    expect(html).toContain('data-action-id="report"');
+    expect(html).toContain(">Report</button>");
+    expect(html).not.toContain("<ul");
+  });
+
+  it("escapes hostile item and action ids in the data attributes", () => {
+    const hostile = {
+      itemId: 'a"><img src=x>',
+      class: "bill",
+      readAloudText: "A bill",
+      proposedActions: [{ actionId: "'><script>alert(1)</script>", type: "Pay" }]
+    };
+    const html = renderScreen({ toolName: "list_items", arguments: {}, result: { items: [hostile] } });
+    expect(html).toContain('data-item-id="a&quot;&gt;&lt;img src=x&gt;"');
+    expect(html).toContain('data-action-id="&#39;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"');
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<script>");
+  });
+
+  it("renders an empty state when there are no items", () => {
+    const html = renderScreen({ toolName: "list_items", arguments: {}, result: { items: [] } });
+    expect(html).toBe('<p class="empty">Nothing to show yet.</p>');
+  });
+
+  it("falls back safely for malformed item payloads", () => {
+    expect(renderScreen({ toolName: "get_scan", arguments: {}, result: { items: "nope" } })).toBe(
+      '<p class="empty">Nothing to show yet.</p>'
+    );
+    expect(renderScreen({ toolName: "get_scan", arguments: {}, result: null })).toBe(
+      '<p class="empty">Nothing to show yet.</p>'
+    );
+  });
+});
+
+describe("renderScreen: get_item", () => {
+  it("renders a single item", () => {
+    const html = renderScreen({
+      toolName: "get_item",
+      arguments: {},
+      result: { item: { itemId: "i1", class: "label", readAloudText: "Milk" } }
+    });
+    expect(html).toContain("<h2>label</h2>");
+    expect(html).toContain("<p>Milk</p>");
+  });
+
+  it("renders an empty state when the item is absent", () => {
+    expect(renderScreen({ toolName: "get_item", arguments: {}, result: {} })).toBe('<p class="empty">No item.</p>');
+  });
+});
+
+describe("renderScreen: daily_briefing", () => {
+  it("renders a reminders card and alert tone when flagged", () => {
+    const html = renderScreen({
+      toolName: "daily_briefing",
+      arguments: {},
+      result: { due: [1], flagged: [1], appointments: [1], objectReminders: [1, 2] }
+    });
+    expect(html).toContain("Reminders");
+    expect(html).toContain('<p class="big">2</p>');
+    expect(html).toContain("card--info");
+    expect(html).toContain("card--alert");
+  });
+
+  it("renders the reminders card with no info tone when reminders are absent", () => {
+    const html = renderScreen({
+      toolName: "daily_briefing",
+      arguments: {},
+      result: { due: [], flagged: [], appointments: [] }
+    });
+    expect(html).toContain("Reminders");
+    expect(html).not.toContain("card--alert");
+    expect(html).not.toContain("card--info");
+  });
+});
+
+describe("renderScreen: identify_product", () => {
+  it("renders an escaped name, label, and disclaimer", () => {
+    const html = renderScreen({
+      toolName: "identify_product",
+      arguments: {},
+      result: { available: true, name: "<b>Acme</b>", labelText: "Ingredients <x>", disclaimer: "Not <advice>" }
+    });
+    expect(html).toContain("&lt;b&gt;Acme&lt;/b&gt;");
+    expect(html).toContain("Ingredients &lt;x&gt;");
+    expect(html).toContain("Not &lt;advice&gt;");
+  });
+
+  it("reports an unavailable label when the product is unavailable", () => {
+    expect(renderScreen({ toolName: "identify_product", arguments: {}, result: { available: false } })).toBe(
+      '<p class="empty">I couldn\'t read that label.</p>'
+    );
+  });
+
+  it("reports an unavailable label when there is no label text", () => {
+    expect(renderScreen({ toolName: "identify_product", arguments: {}, result: { labelText: "" } })).toBe(
+      '<p class="empty">I couldn\'t read that label.</p>'
+    );
+  });
+});
+
+describe("renderScreen: find_object", () => {
+  it("renders the found object with an escaped location note", () => {
+    const html = renderScreen({
+      toolName: "find_object",
+      arguments: {},
+      result: { found: { name: "Keys", locationNote: "on the <hook>" } }
+    });
+    expect(html).toContain("Keys");
+    expect(html).toContain("on the &lt;hook&gt;");
+  });
+
+  it("renders an unknown place when the location note is missing", () => {
+    const html = renderScreen({ toolName: "find_object", arguments: {}, result: { found: { name: "Keys" } } });
+    expect(html).toContain("an unknown place");
+  });
+
+  it("renders an empty state when nothing is found", () => {
+    expect(renderScreen({ toolName: "find_object", arguments: {}, result: {} })).toBe(
+      "<p class=\"empty\">I don't have a location for that.</p>"
+    );
+  });
+});
+
+describe("renderScreen: act_on_item", () => {
+  it("renders the action and item card", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: { action: { type: "Pay", status: "done" }, item: { readAloudText: "Paid <bill>" } }
+    });
+    expect(html).toContain("Pay · done");
+    expect(html).toContain("card--info");
+    expect(html).toContain("Paid &lt;bill&gt;");
+  });
+});
+
+describe("renderConfirm", () => {
+  it("renders exact Yes and Cancel buttons with the action id", () => {
+    const html = renderConfirm({ actionId: "report", type: "Report" });
+    expect(html).toContain('<button type="button" class="confirm__yes" data-action-id="report">Yes</button>');
+    expect(html).toContain('<button type="button" class="confirm__no">Cancel</button>');
+    expect(html).toContain('<section class="confirm" role="alertdialog" aria-label="Confirm action">');
+    expect(html).toContain("Carry out <strong>Report</strong>?");
+  });
+
+  it("escapes a hostile action type and action id", () => {
+    const html = renderConfirm({ actionId: '\'><img src=x onerror=alert(1)>', type: "<img src=x onerror=alert(1)>" });
+    expect(html).toContain("Carry out <strong>&lt;img src=x onerror=alert(1)&gt;</strong>?");
+    expect(html).toContain('data-action-id="&#39;&gt;&lt;img src=x onerror=alert(1)&gt;"');
+    expect(html).not.toContain("<img");
+  });
+});
+
+describe("renderScreen: fallbacks", () => {
+  it("renders an empty state for unknown tools", () => {
+    expect(renderScreen({ toolName: "mystery", arguments: {}, result: {} })).toBe(
+      '<p class="empty">Nothing to show yet.</p>'
+    );
+  });
+
+  it("renders an empty state for a malformed result", () => {
+    expect(renderScreen({ toolName: "list_items", arguments: {}, result: undefined })).toBe(
+      '<p class="empty">Nothing to show yet.</p>'
+    );
+  });
+});

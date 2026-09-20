@@ -1,4 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
+import { APP_RESOURCE_URI, readAppHtml } from "./appResource.js";
 import { z } from "zod";
 import type { Store } from "../storage/types.js";
 import type { Extractor } from "../domain/scanPipeline.js";
@@ -65,10 +67,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "get_scan",
-    "Return the items found in a previous scan, with their suggested actions.",
-    { scanId: z.string() },
+    {
+      description: "Return the items found in a previous scan, with their suggested actions.",
+      inputSchema: { scanId: z.string() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ scanId }) => {
       const scan = await deps.store.getScan(scanId);
       if (!scan) {
@@ -102,10 +108,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "find_object",
-    "Find where an object was last seen.",
-    { name: z.string() },
+    {
+      description: "Find where an object was last seen.",
+      inputSchema: { name: z.string() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ name }) => {
       let found;
       try {
@@ -152,10 +162,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "list_items",
-    "List the customer's items, optionally filtered to unresolved, due, or flagged.",
-    { filter: z.enum(["unresolved", "due", "flagged", "all"]).default("unresolved") },
+    {
+      description: "List the customer's items, optionally filtered to unresolved, due, or flagged.",
+      inputSchema: { filter: z.enum(["unresolved", "due", "flagged", "all"]).default("unresolved") },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ filter }) => {
       let items: Item[];
       try {
@@ -163,17 +177,24 @@ export function buildServer(deps: ServerDeps): McpServer {
       } catch (err) {
         return safeError("list_items", err);
       }
+      const spoken = items
+        .map((i) => (i.class === "label" ? `${i.readAloudText} ${copy.disclaimers.label}` : i.readAloudText))
+        .join(" ");
       return {
-        content: [{ type: "text", text: items.length ? copy.itemsListed(items.length) : copy.nothingFound }],
+        content: [{ type: "text", text: spoken || copy.nothingFound }],
         structuredContent: { items }
       };
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "get_item",
-    "Return one item's full detail and read-aloud text.",
-    { itemId: z.string() },
+    {
+      description: "Return one item's full detail and read-aloud text.",
+      inputSchema: { itemId: z.string() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ itemId }) => {
       let item: Item | null;
       try {
@@ -209,10 +230,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "identify_product",
-    "Read a product, food, or medication label back to the customer, verbatim.",
-    { imageRefs: z.array(z.string()).min(1) },
+    {
+      description: "Read a product, food, or medication label back to the customer, verbatim.",
+      inputSchema: { imageRefs: z.array(z.string()).min(1) },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ imageRefs }) => {
       if (!deps.extract) {
         return { content: [{ type: "text", text: copy.readerUnavailable }], structuredContent: { available: false } };
@@ -236,10 +261,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "daily_briefing",
-    "Give the customer a summary of what is due, upcoming, or flagged, plus saved object reminders.",
-    { date: z.string().optional() },
+    {
+      description: "Give the customer a summary of what is due, upcoming, or flagged, plus saved object reminders.",
+      inputSchema: { date: z.string().optional() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ date }) => {
       if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return { content: [{ type: "text", text: copy.invalidDate }], isError: true as const };
@@ -312,6 +341,16 @@ export function buildServer(deps: ServerDeps): McpServer {
           }
         }
       ]
+    })
+  );
+
+  registerAppResource(
+    server,
+    "Wayfinder View",
+    APP_RESOURCE_URI,
+    { description: "Interactive Wayfinder cards: inbox, item detail, briefing, labels." },
+    async () => ({
+      contents: [{ uri: APP_RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: readAppHtml() }]
     })
   );
 
