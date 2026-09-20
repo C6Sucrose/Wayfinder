@@ -129,3 +129,33 @@ describe("wayfinder://ledger", () => {
     await client.close();
   });
 });
+
+describe("escalate_item", () => {
+  it("records an escalation and moves the document to escalated", async () => {
+    const { client, store } = await connect();
+    await store.putItem(item({ itemId: "itm_esc" }));
+    await store.putPreferences({ ...(await store.getPreferences()), trustedContactAlias: "Priya" });
+    const res = await client.callTool({ name: "escalate_item", arguments: { documentId: "itm_esc", reason: "couldn't read it" } });
+    expect((res.content as Array<{ text: string }>)[0]!.text).toBe(copy.escalated("Priya"));
+    expect((await store.listLedger()).map((e) => e.event)).toContain("escalated");
+    expect((await store.getItem("itm_esc"))?.record?.lifecycle).toBe("escalated");
+    await client.close();
+  });
+
+  it("declines without a trusted contact", async () => {
+    const { client, store } = await connect();
+    await store.putItem(item({ itemId: "itm_esc" }));
+    const res = await client.callTool({ name: "escalate_item", arguments: { documentId: "itm_esc" } });
+    expect(res.isError).toBe(true);
+    expect((res.content as Array<{ text: string }>)[0]!.text).toBe(copy.noTrustedContact);
+    await client.close();
+  });
+
+  it("asks for a target when none is given", async () => {
+    const { client } = await connect();
+    const res = await client.callTool({ name: "escalate_item", arguments: {} });
+    expect(res.isError).toBe(true);
+    expect((res.content as Array<{ text: string }>)[0]!.text).toBe(copy.escalateTarget);
+    await client.close();
+  });
+});
