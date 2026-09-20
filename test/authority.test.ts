@@ -33,6 +33,11 @@ describe("evaluateAuthority", () => {
   it("confirms an amount above the auto-action ceiling", () => {
     expect(evaluateAuthority({ actionType: "remind", amount: { currency: "EUR", value: 500 }, record: record(), authority }).decision).toBe("confirm");
   });
+  it("confirms a small amount in a currency other than the envelope's", () => {
+    const result = evaluateAuthority({ actionType: "remind", amount: { currency: "USD", value: 20 }, record: record(), authority });
+    expect(result.decision).toBe("confirm");
+    expect(result.reason.length).toBeGreaterThan(0);
+  });
   it("refuses a forbidden action regardless of amount", () => {
     const result = evaluateAuthority({ actionType: "share", amount: { currency: "EUR", value: 1 }, record: record(), authority });
     expect(result.decision).toBe("refuse");

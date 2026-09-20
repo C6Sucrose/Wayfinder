@@ -35,6 +35,9 @@ export function evaluateAuthority(input: {
   }
 
   if (amount) {
+    if (amount.currency !== authority.confirmAbove.currency) {
+      return { decision: "confirm", reason: `This amount is in ${amount.currency} but your limits are in ${authority.confirmAbove.currency}, so I need you to confirm it.` };
+    }
     if (amount.value >= authority.confirmAbove.value || amount.value > authority.autoActUpTo.value) {
       return { decision: "confirm", reason: "This is above the amount I can act on without asking." };
     }
