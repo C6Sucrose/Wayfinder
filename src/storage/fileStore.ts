@@ -7,6 +7,7 @@ import {
   ActionSchema, ItemSchema, LedgerEntrySchema, PreferencesSchema, ScanSchema, StoredObjectSchema,
   type Action, type Item, type LedgerEntry, type Scan, type StoredObject
 } from "../domain/model.js";
+import { lifecycleOf } from "../domain/lifecycle.js";
 
 const ID_PATTERN = /^[a-z]+_[a-z0-9-]{1,64}$/;
 
@@ -89,10 +90,17 @@ export function createFileStore(dir: string): Store {
         .map((f) => readValidated<Item>(join(itemsDir, f), ItemSchema))
         .filter((i): i is Item => i !== null);
       if (filter === "all") return all;
-      if (filter === "unresolved") return all.filter((i) => i.resolvedAt === null);
+      if (filter === "unresolved") return all.filter((i) => {
+        const lifecycle = lifecycleOf(i);
+        return lifecycle !== "closed" && lifecycle !== "confirmed";
+      });
       if (filter === "flagged") return all.filter(isFlagged);
       const today = new Date().toISOString().slice(0, 10);
-      return all.filter((i) => i.resolvedAt === null && i.fields.dueDate !== undefined && i.fields.dueDate <= today);
+      return all.filter((i) => {
+        const lifecycle = lifecycleOf(i);
+        return lifecycle !== "closed" && lifecycle !== "confirmed"
+          && i.fields.dueDate !== undefined && i.fields.dueDate <= today;
+      });
     },
     async putAction(a) {
       assertSafeId(a.itemId);
