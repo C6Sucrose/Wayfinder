@@ -5,8 +5,10 @@
 **Primary track:** Alexa+ · **Mini challenges:** AWS Builder, Open Source
 **Submission deadline:** 2026-10-23
 **Spec date:** 2026-09-19
-**Status:** Approved for implementation planning
+**Status:** Approved for implementation planning — **partially superseded by v2**
 **Supersedes:** `2026-09-19-hearthrail-design.md` (concept pivot)
+
+> **PARTIALLY SUPERSEDED (2026-09-20).** See `2026-09-20-wayfinder-v2-verifiable-agency.md`. v2 replaces this spec's: §1 Summary, §2 Problem & Impact, §4 Differentiation, §6 Scope, §8.1 MCP surface (tools/resources), §9 Domain Model, §10 Data Flow, and §12 MCP Apps UI (screens). Everything else here — architecture, auth, AWS, testing, delivery, submission artifacts — remains authoritative. Where the two disagree, **v2 wins**.
 
 > Name note: "Wayfinder" is a working name. The concept name "Compass" was rejected for trademark risk (e.g., Compass real-estate tech). All user-facing strings live in one place, so renaming is mechanical. A formal clearance check is an open item.
 
