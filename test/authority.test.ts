@@ -1,0 +1,81 @@
+import { describe, it, expect } from "vitest";
+import { kindFor, evaluateAuthority } from "../src/domain/authority.js";
+import { copy } from "../src/domain/copy.js";
+import type { Authority, DocumentRecord } from "../src/domain/model.js";
+
+const authority: Authority = {
+  autoActUpTo: { currency: "EUR", value: 100 },
+  confirmAbove: { currency: "EUR", value: 50 },
+  forbidden: ["share_personal_data", "delete_document"],
+  onLowConfidence: "ask"
+};
+
+const record = (confidence: "high" | "low" = "high"): DocumentRecord => ({
+  itemId: "itm_1", scanId: "scn_1", class: "bill", confidence: 0.9, readAloudText: "bill",
+  fields: {}, proposedActions: [], createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null,
+  record: { lifecycle: "awaiting_action", confidence, needsRecapture: false, demands: [], threadKey: "t_1" }
+});
+
+describe("kindFor", () => {
+  it("maps action types to policy kinds", () => {
+    expect(kindFor("remind")).toBe("other");
+    expect(kindFor("share")).toBe("share_personal_data");
+    expect(kindFor("discard")).toBe("discard_document");
+  });
+});
+
+describe("evaluateAuthority", () => {
+  it("allows a small amount under both thresholds", () => {
+    expect(evaluateAuthority({ actionType: "remind", amount: { currency: "EUR", value: 20 }, record: record(), authority }).decision).toBe("allow");
+  });
+  it("confirms an amount above the confirmation floor", () => {
+    expect(evaluateAuthority({ actionType: "remind", amount: { currency: "EUR", value: 60 }, record: record(), authority }).decision).toBe("confirm");
+  });
+  it("confirms an amount above the auto-action ceiling", () => {
+    expect(evaluateAuthority({ actionType: "remind", amount: { currency: "EUR", value: 500 }, record: record(), authority }).decision).toBe("confirm");
+  });
+  it("confirms a small amount in a currency other than the envelope's", () => {
+    const result = evaluateAuthority({ actionType: "remind", amount: { currency: "USD", value: 20 }, record: record(), authority });
+    expect(result.decision).toBe("confirm");
+    expect(result.reason.length).toBeGreaterThan(0);
+  });
+  it("refuses a forbidden action regardless of amount", () => {
+    const result = evaluateAuthority({ actionType: "share", amount: { currency: "EUR", value: 1 }, record: record(), authority });
+    expect(result.decision).toBe("refuse");
+    expect(result.reason.length).toBeGreaterThan(0);
+  });
+  it("sources spoken reasons from the shared copy module", () => {
+    const result = evaluateAuthority({ actionType: "share", record: record(), authority });
+    expect(result.reason).toBe(copy.authority.forbidden("share_personal_data"));
+  });
+  it("confirms a low-confidence action when the policy is ask", () => {
+    expect(evaluateAuthority({ actionType: "file", record: record("low"), authority }).decision).toBe("confirm");
+  });
+  it("refuses a forbidden action even at low confidence with the ask policy", () => {
+    const result = evaluateAuthority({ actionType: "share", record: record("low"), authority });
+    expect(result.decision).toBe("refuse");
+    expect(result.reason.length).toBeGreaterThan(0);
+  });
+  it("confirms when the amount currency matches neither limit's currency", () => {
+    const splitCurrency: Authority = {
+      autoActUpTo: { currency: "USD", value: 100 },
+      confirmAbove: { currency: "EUR", value: 50 },
+      forbidden: [],
+      onLowConfidence: "ask"
+    };
+    const result = evaluateAuthority({ actionType: "remind", amount: { currency: "EUR", value: 20 }, record: record(), authority: splitCurrency });
+    expect(result.decision).toBe("confirm");
+    expect(result.reason.length).toBeGreaterThan(0);
+  });
+  it("refuses a low-confidence action when the policy is refuse", () => {
+    expect(evaluateAuthority({ actionType: "file", record: record("low"), authority: { ...authority, onLowConfidence: "refuse" } }).decision).toBe("refuse");
+  });
+  it("refuses with an escalation reason when the policy is escalate", () => {
+    const result = evaluateAuthority({ actionType: "file", record: record("low"), authority: { ...authority, onLowConfidence: "escalate" } });
+    expect(result.decision).toBe("refuse");
+    expect(result.reason.toLowerCase()).toContain("trusted contact");
+  });
+  it("allows a high-confidence non-forbidden action with no amount", () => {
+    expect(evaluateAuthority({ actionType: "file", record: record(), authority }).decision).toBe("allow");
+  });
+});
