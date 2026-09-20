@@ -4,8 +4,8 @@ import { randomUUID } from "node:crypto";
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Store } from "./types.js";
 import {
-  ActionSchema, ItemSchema, PreferencesSchema, ScanSchema, StoredObjectSchema,
-  type Action, type Item, type Scan, type StoredObject
+  ActionSchema, ItemSchema, LedgerEntrySchema, PreferencesSchema, ScanSchema, StoredObjectSchema,
+  type Action, type Item, type LedgerEntry, type Scan, type StoredObject
 } from "../domain/model.js";
 
 const ID_PATTERN = /^[a-z]+_[a-z0-9-]{1,64}$/;
@@ -63,6 +63,21 @@ export function createFileStore(dir: string): Store {
     item.class === "scam" ||
     readActions(item.itemId).some((a) => a.type === "flag" && (a.status === "done" || a.status === "confirmed"));
 
+  const readLedger = (): LedgerEntry[] => {
+    const raw = readJson<unknown>(join(dir, "ledger.json"));
+    if (!Array.isArray(raw)) return [];
+    const entries: LedgerEntry[] = [];
+    for (const entry of raw) {
+      const parsed = LedgerEntrySchema.safeParse(entry);
+      if (!parsed.success) {
+        console.error("[fileStore] skipping invalid ledger entry:", parsed.error);
+        continue;
+      }
+      entries.push(parsed.data);
+    }
+    return entries;
+  };
+
   return {
     async putScan(s) { assertSafeId(s.scanId); writeJson(join(scansDir, `${s.scanId}.json`), s); },
     async getScan(id) { assertSafeId(id); return readValidated<Scan>(join(scansDir, `${id}.json`), ScanSchema); },
@@ -101,7 +116,13 @@ export function createFileStore(dir: string): Store {
       }
       return parsed.data;
     },
-    async putPreferences(p) { writeJson(join(dir, "preferences.json"), p); }
+    async putPreferences(p) { writeJson(join(dir, "preferences.json"), p); },
+    async listLedger() { return readLedger(); },
+    async putLedgerEntry(e) {
+      const entries = readLedger();
+      entries.push(e);
+      writeJson(join(dir, "ledger.json"), entries);
+    }
   };
 }
 
