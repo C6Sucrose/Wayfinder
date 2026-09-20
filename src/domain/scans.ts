@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Store } from "../storage/types.js";
-import type { Item, Scan } from "./model.js";
+import type { DocumentState, Item, Scan } from "./model.js";
 import { ItemSchema } from "./model.js";
 import { classifyText } from "./classifier.js";
 import { extractFields } from "./extractors.js";
@@ -8,6 +8,9 @@ import { redactSensitive } from "./redact.js";
 import { scoreScam } from "./scam.js";
 import { planActions } from "./actionPlanner.js";
 import { copy } from "./copy.js";
+import { assessReadback } from "./readback.js";
+import { toDocumentRecord } from "./correlation.js";
+import { createLedger } from "./ledgerLog.js";
 
 export function scanCompleteMessage(scan: Scan | null): string {
   return scan?.status === "ready" ? copy.scanReady : copy.scanFailed;
@@ -79,11 +82,20 @@ async function runProcessScan(store: Store, scanId: string, texts: string[]): Pr
       const itemId = `itm_${randomUUID().slice(0, 8)}`;
       const createdAt = new Date().toISOString();
       const readAloudText = redactSensitive(text);
-      const actions = planActions(
-        { itemId, scanId, class: cls, confidence, readAloudText, fields, proposedActions: [], createdAt, resolvedAt: null },
-        scam
-      );
-      items.push(ItemSchema.parse({ itemId, scanId, class: cls, confidence, readAloudText, fields, proposedActions: actions, createdAt, resolvedAt: null }));
+      const base: Item = {
+        itemId, scanId, class: cls, confidence, readAloudText, fields,
+        proposedActions: [], createdAt, resolvedAt: null
+      };
+      const actions = planActions(base, scam);
+      const assessment = assessReadback({ text, fields, now: new Date(createdAt) });
+      const derived = toDocumentRecord(base).record;
+      const record: DocumentState = {
+        ...derived,
+        lifecycle: assessment.confidence === "low" ? "awaiting_action" : "open",
+        confidence: assessment.confidence,
+        needsRecapture: assessment.needsRecapture
+      };
+      items.push(ItemSchema.parse({ ...base, proposedActions: actions, record }));
     }
   } catch (err) {
     console.error(`[scans] scan ${scanId} failed during analysis:`, err);
@@ -109,6 +121,26 @@ async function runProcessScan(store: Store, scanId: string, texts: string[]): Pr
     const failed: Scan = { ...analyzing, status: "failed" };
     await store.putScan(failed);
     return failed;
+  }
+
+  const ledger = createLedger(store);
+  for (const item of items) {
+    const record = item.record;
+    if (!record) continue;
+    try {
+      await ledger.append({
+        at: item.createdAt, actor: "agent", event: "ingested",
+        documentId: item.itemId, threadKey: record.threadKey,
+        details: { class: item.class, confidence: record.confidence }
+      });
+      await ledger.append({
+        at: item.createdAt, actor: "agent", event: "triaged",
+        documentId: item.itemId, threadKey: record.threadKey,
+        details: { lifecycle: record.lifecycle, needsRecapture: record.needsRecapture }
+      });
+    } catch (err) {
+      console.error(`[scans] ledger append for ${item.itemId} failed:`, err);
+    }
   }
 
   const done: Scan = { ...analyzing, status: items.length > 0 ? "ready" : "failed" };
