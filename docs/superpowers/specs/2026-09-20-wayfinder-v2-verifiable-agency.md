@@ -49,7 +49,7 @@ Each pillar is load-bearing; removing one breaks the thesis. Abstention protects
 **Mechanisms**
 
 1. **Append-only, hash-chained log.** Every event is an entry. `hash = SHA-256(prevHash + "\n" + canonicalJSON(entryWithoutHash))`, where `canonicalJSON` sorts keys and emits no whitespace. The genesis `prevHash` is 64 zeros.
-2. **Events:** `ingested`, `triaged`, `action_proposed`, `action_confirmed`, `action_refused`, `superseded`, `flag_raised`, `escalated`, `closed`.
+2. **Events:** `ingested`, `triaged`, `action_proposed`, `action_confirmed`, `action_refused`, `delivery_failed`, `superseded`, `flag_raised`, `escalated`, `closed`.
 3. **Redaction at write.** `LedgerEntry.details` is passed through `redactSensitive` (v1) **before** hashing, so account numbers never enter the chain in the clear. The chain commits to redacted content, and `export_record` inherits that guarantee.
 4. **Verification.** A pure `verifyLedger(entries)` recomputes the chain and returns `{ ok, entries, firstMismatchSeq? }`. It is exposed both as a test helper and as an MCP tool so the agent can prove its own record.
 5. **Export.** `buildRecordReport(entries, range)` produces a human-readable, voice-friendly situation report (Markdown) that includes the terminal chain hash, so a caregiver, advocate, bank, or ombudsman can verify it independently.
@@ -114,6 +114,10 @@ interface LedgerEntry {
   hash: string;
 }
 
+type LedgerEvent =
+  | "ingested" | "triaged" | "action_proposed" | "action_confirmed" | "action_refused"
+  | "delivery_failed" | "superseded" | "flag_raised" | "escalated" | "closed";
+
 interface Thread {
   threadKey: string;
   sender: string;
@@ -169,7 +173,7 @@ All five rules are pure functions with unit tests.
 
 ### 5.3 Resources & UI
 
-- Resource `wayfinder://ledger` alongside `wayfinder://inbox` and `wayfinder://objects`.
+- Resources: `wayfinder://ledger`, `wayfinder://inbox`, `wayfinder://objects`, and `wayfinder://capabilities` (see §9.7).
 - MCP App screens: **backlog** (threads + urgency + reminder count), **audit/history**, **verification badge** (shows `verify_ledger` result), **refusal** card (reason + escalate affordance).
 
 ---
@@ -201,12 +205,116 @@ All five rules are pure functions with unit tests.
 
 ## 8. Scope
 
-**In:** the three pillars; lifecycle; correlation; the five new tools; the changed tools; the four screens; the ledger resource; deterministic tests for every rule and checksum.
-**Out (unchanged from v1):** real bank/utility integration; real-time monitoring; medical advice; reordering/purchases; third-party attestation.
+**In:** the three pillars; lifecycle; correlation; the five new tools; the changed tools; the four screens; the resources (`wayfinder://ledger`, `wayfinder://capabilities`); the six ports with null adapters, the conformance harness, and the three reference adapters (`WebhookNotifier`, `IcsFileSink`, EPC QR `PaymentHandoff`); deterministic tests for every rule, checksum, and adapter contract.
+
+**Now pluggable (previously "out"):** bank/utility connectivity via `DocumentSource` + `PaymentHandoff`; user-owned monitoring via `DocumentSource`; third-party attestation via `SignatureProvider`; human assistance via `AssistProvider`.
+
+**Out — permanently, not for isolation:** payment **execution**; medical or financial **advice**; **emergency-response** claims; reordering/purchases; any adapter we would have to operate on the user's behalf. These are excluded because they move the product into regulated or unsafe territory, not because we want the project isolated.
 
 ---
 
-## 9. Risks
+## 9. Extension points (ports & adapters)
+
+**Principle.** Optional services are reached only through small *ports*. Every port ships a **null adapter** that preserves current behaviour exactly, a **conformance harness** every adapter must pass, and a `docs/adapters/<port>.md` recipe. Nothing is enabled by default, nothing is required, and no port may weaken the three pillars. This keeps the core self-contained while letting an operator personalise a deployment — including the two seams that unlock the most value safely (§9.3, §9.4).
+
+### 9.1 The ports
+
+| Port | Null adapter (default = today) | Reference adapter built | Documented recipe only |
+|---|---|---|---|
+| `Notifier` | ledger + spoken reply | `WebhookNotifier` | SMTP, ntfy, user's own Twilio |
+| `CalendarSink` | internal ledger | `IcsFileSink` | CalDAV |
+| `PaymentHandoff` | spoken/text instruction + ledger | EPC QR generator | user's banking deep link |
+| `SignatureProvider` | local SHA-256 chain | — | AWS KMS sign, RFC 3161 / OpenTimestamps |
+| `DocumentSource` | camera / upload | — | IMAP folder, watched directory, inbound webhook |
+| `AssistProvider` | none | — | user's Be My Eyes / Aira account |
+
+`Extractor` (vision/OCR) and the agent `Brain` are already ports from v1/Plan 3; this section makes that pattern uniform and documented.
+
+### 9.2 Interfaces
+
+```ts
+interface Notifier {
+  notify(input: {
+    event: LedgerEvent;
+    documentId?: string;
+    threadKey?: string;
+    summary: string;            // already redacted by the caller
+  }): Promise<{ delivered: boolean; detail: string }>;
+}
+
+interface CalendarSink {
+  publish(input: { title: string; start: string; durationMinutes?: number; description?: string }):
+    Promise<{ ref: string }>;
+}
+
+interface PaymentHandoff {
+  // Pure, synchronous, no network. Never executes or initiates a payment.
+  prepare(input: {
+    amount: { currency: string; value: number };
+    beneficiaryName: string;
+    iban: string;
+    remittance: string;
+  }): { instruction: string; epcQr?: string; ledgerNote: string };
+}
+
+interface SignatureProvider {
+  attest(headHash: string): Promise<{ kind: "local" | "kms" | "tsa"; proof: string }>;
+}
+
+interface DocumentSource {
+  poll(cursor: string | undefined): Promise<{ imageRefs: string[]; texts: string[]; cursor: string }>;
+}
+
+interface AssistProvider {
+  request(input: { reason: string; documentId?: string }): Promise<{ sessionRef: string }>;
+}
+```
+
+### 9.3 `PaymentHandoff` — the honest answer to "connect my bank"
+
+We never execute a payment, hold credentials, or give financial advice (§14). Instead `prepare` returns a spoken instruction plus an **EPC069-12 (SEPA) QR payload**. The user scans it **in their own banking app**, which performs the transfer. The generator is a pure function — fully unit-testable — and the ledger records that a handoff was produced, not that money moved.
+
+Required: `epcQr` encodes exactly `BCD`, version, UTF-8, `SCT`, optional BIC, beneficiary name, IBAN, amount (`EUR12.50`), optional purpose, remittance, and a **CRC16-CCITT (0x1021) checksum over the payload including its trailing newline**, uppercase hex. An invalid IBAN (per §2.1) must refuse to generate a payload.
+
+### 9.4 `SignatureProvider` — attestation becomes pluggable
+
+The local hash chain remains the default and still verifies offline. An operator may layer an external attestation (KMS asymmetric signature, RFC 3161 timestamp, OpenTimestamps). `attest(headHash)` returns the proof, which is stored with the ledger head and shown by `verify_ledger` as `{ kind, proof }`. The spec, UI, and demo must state precisely what was attested — a hash and a time — and must not claim legal or evidentiary weight.
+
+### 9.5 `DocumentSource` — safe "monitoring"
+
+A user-owned channel (their mailbox, their watched folder, their inbound webhook) may deliver documents into the same pipeline as camera capture. This is the only permitted form of monitoring: user-consented, user-owned, and with no claim of real-time surveillance or emergency detection.
+
+### 9.6 Adapter rules (binding)
+
+1. **Disabled by default.** An adapter is inert unless explicitly configured via environment (`WAYFINDER_ADAPTER_<PORT>`) or `Preferences.adapters`. The null adapter is the default in every code path and test.
+2. **Never in the request path.** Adapters that touch the network (`Notifier`, `CalendarSink`, external `SignatureProvider`, `AssistProvider`, `DocumentSource` polling) run in the worker or after the tool response. The **< 500 ms tool-handler budget is inviolable**.
+3. **Redact before transmit.** Payloads pass through `redactSensitive` (v1) before leaving the process.
+4. **HTTPS only, exact-URL allowlist, hard timeout (5 s), and idempotency.** A notification carries the originating `entryId` so a retry cannot double-notify.
+5. **Secrets** come from the environment or AWS Secrets Manager; they are never logged and never written to the ledger.
+6. **Failures are visible.** A delivery failure appends a `delivery_failed` ledger event and is spoken; it is never silent.
+7. **Conformance.** Each port has a contract suite (`test/adapters/contract.ts`); `scripts/adapters-conformance.mjs` runs every configured adapter against it and exits non-zero on failure.
+
+### 9.7 Capability disclosure
+
+The system reports what is actually wired, never what is merely possible:
+- MCP resource `wayfinder://capabilities` and HTTP `GET /capabilities` return `{ adapters: { notifier: "webhook" | "null", … }, chain: { head, verified } }`.
+- The ledger records an entry whenever an external service is invoked.
+
+### 9.8 The permanent line
+
+Independently of ports, these are **never** shipped, not even as seams: payment **execution**, medical or financial **advice**, and **emergency-response** capability. `PaymentHandoff` produces instructions; it never moves money.
+
+**Acceptance criteria**
+- With no adapters configured, behaviour and the full test suite are unchanged from v2's non-adapter state.
+- An invalid IBAN cannot produce an `epcQr` payload.
+- `epcQr` output round-trips through an independent CRC16 check.
+- A configured `WebhookNotifier` is invoked only off the request path, with a redacted payload, and a forced failure produces a `delivery_failed` entry.
+- `/capabilities` reports `null` for every unconfigured port.
+
+---
+
+## 10. Risks
+
 
 | Risk | Mitigation |
 |---|---|
