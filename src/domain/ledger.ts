@@ -25,12 +25,21 @@ export function hashEntry(prevHash: string, entry: Omit<LedgerEntry, "hash">): s
   return createHash("sha256").update(`${prevHash}\n${canonicalJSON(entry)}`).digest("hex");
 }
 
-function redactDetails(details: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(details)) {
-    out[key] = typeof value === "string" ? redactSensitive(value) : value;
+function redactValue(value: unknown): unknown {
+  if (typeof value === "string") return redactSensitive(value);
+  if (Array.isArray(value)) return value.map(redactValue);
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = redactValue(nested);
+    }
+    return out;
   }
-  return out;
+  return value;
+}
+
+function redactDetails(details: Record<string, unknown>): Record<string, unknown> {
+  return redactValue(details) as Record<string, unknown>;
 }
 
 export function appendLedgerEntry(
