@@ -109,7 +109,9 @@ describe("daily_briefing", () => {
     const { client, store } = await connect();
     await store.putItem(item());
     const res = await client.callTool({ name: "daily_briefing", arguments: { date: "2026-09-20" } });
-    expect((res.content as Array<{ text: string }>)[0]!.text).toContain("City Water");
+    const text = (res.content as Array<{ text: string }>)[0]!.text;
+    expect(text).toContain("City Water");
+    expect(text).not.toContain(copy.briefing.clear);
     await client.close();
   });
 });

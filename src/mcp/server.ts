@@ -386,11 +386,13 @@ export function buildServer(deps: ServerDeps): McpServer {
       if (appointments.length) parts.push(copy.briefing.appointments(appointments.length));
       if (flagged.length) parts.push(copy.briefing.flagged(flagged.length));
       if (objectReminders.length) parts.push(copy.briefing.reminders(objectReminders.length));
-      const summary = parts.length ? copy.briefing.summary(parts) : copy.briefing.clear;
       const outstanding = backlog.filter((e) => e.thread.outstanding);
       const lead = outstanding.length
         ? `${copy.backlog.summary(outstanding.length, describeThread(outstanding[0]!.thread, outstanding[0]!.deadline))} `
         : "";
+      const summary = parts.length
+        ? copy.briefing.summary(parts)
+        : outstanding.length ? "" : copy.briefing.clear;
 
       return {
         content: [{ type: "text", text: `${lead}${summary}` }],
