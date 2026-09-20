@@ -48,4 +48,11 @@ describe("describeThread", () => {
     expect(text).toContain("2026-09-22");
     expect(text).toContain("2 reminder(s)");
   });
+
+  it("uses the article 'an' for an appointment", () => {
+    const text = describeThread(
+      { threadKey: "t", sender: "Clinic", demandType: "appointment", documentIds: [], firstSeenAt: "", lastSeenAt: "", reminderCount: 0, urgency: "medium", outstanding: true }
+    );
+    expect(text).toContain("an appointment");
+  });
 });

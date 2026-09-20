@@ -67,4 +67,39 @@ describe("applyAction authority gate", () => {
     expect(result.decision).toBe("escalate");
     expect((await store.listLedger()).map((e) => e.event)).toContain("escalated");
   });
+
+  it("records the receipt before mutating, so a failed receipt leaves state untouched", async () => {
+    await store.putItem(item({
+      record: { lifecycle: "awaiting_action", confidence: "high", needsRecapture: false, demands: [], threadKey: "t_1" }
+    }));
+    await withAuthority();
+    const flaky = {
+      ...store,
+      putLedgerEntry: async () => {
+        throw new Error("ledger unavailable");
+      }
+    };
+    await expect(applyAction(flaky, "itm_a", "itm_a:remind", { confirmed: true })).rejects.toThrow("ledger unavailable");
+    const stored = await store.getItem("itm_a");
+    expect(stored?.record?.lifecycle).toBe("awaiting_action");
+    expect(stored?.proposedActions[0]?.status).toBe("proposed");
+    expect((await store.listLedger()).map((e) => e.event)).not.toContain("action_confirmed");
+  });
+
+  it("records the receipt as an agent action when authority allows it automatically", async () => {
+    await store.putItem(item({ fields: { dueDate: "2026-10-01" } }));
+    await withAuthority();
+    const result = await applyAction(store, "itm_a", "itm_a:remind");
+    expect(result.decision).toBe("allow");
+    const entry = (await store.listLedger()).find((e) => e.event === "action_confirmed");
+    expect(entry?.actor).toBe("agent");
+  });
+
+  it("records the receipt as a user action when the user confirmed", async () => {
+    await store.putItem(item());
+    await withAuthority();
+    await applyAction(store, "itm_a", "itm_a:remind", { confirmed: true });
+    const entry = (await store.listLedger()).find((e) => e.event === "action_confirmed");
+    expect(entry?.actor).toBe("user");
+  });
 });
