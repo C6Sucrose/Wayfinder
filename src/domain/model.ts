@@ -100,18 +100,25 @@ export const AuthoritySchema = z.object({
 });
 export type Authority = z.infer<typeof AuthoritySchema>;
 
+export const AdaptersSchema = z.object({
+  notifier: z.enum(["webhook"]).optional(),
+  calendar: z.enum(["ics"]).optional(),
+  payment: z.enum(["epc"]).optional()
+});
+
 export const PreferencesSchema = z.object({
   verbosity: z.enum(["brief", "normal", "detailed"]).default("normal"),
   trustedContactAlias: z.string().nullable().default(null),
   largeText: z.boolean().default(false),
   locale: z.string().default("en-US"),
-  authority: AuthoritySchema.optional()
+  authority: AuthoritySchema.optional(),
+  adapters: AdaptersSchema.optional()
 });
 export type Preferences = z.infer<typeof PreferencesSchema>;
 
 export const LedgerEventSchema = z.enum([
-  "ingested", "triaged", "action_proposed", "action_confirmed", "action_refused",
-  "delivery_failed", "superseded", "flag_raised", "escalated", "closed"
+  "ingested", "triaged", "action_proposed", "action_executed", "action_confirmed", "action_refused",
+  "delivery_failed", "external_invoked", "superseded", "flag_raised", "escalated", "closed"
 ]);
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>;
 

@@ -15,12 +15,23 @@ import { buildBacklog, describeThread, type BacklogEntry } from "../domain/backl
 import { createLedger } from "../domain/ledgerLog.js";
 import { withLifecycle } from "../domain/lifecycle.js";
 import { buildRecordReport, verifyLedger } from "../domain/ledger.js";
+import { ibanIsValid } from "../domain/validity.js";
 import type { Item } from "../domain/model.js";
+import { buildCapabilities, readChain } from "../adapters/capabilities.js";
+import type { AdapterBundle } from "../adapters/types.js";
+import { nullAdapters } from "../adapters/null.js";
+import type { AdapterConfig } from "../adapters/config.js";
+import type { NotifyQueue } from "../adapters/notifyQueue.js";
+import { trackAdapterTask } from "../adapters/background.js";
+import { publishCalendar } from "../adapters/calendarLog.js";
 
 export interface ServerDeps {
   store: Store;
   extract?: Extractor;
   worker?: ScanWorker;
+  adapters?: AdapterBundle;
+  adapterConfig?: AdapterConfig;
+  notify?: NotifyQueue;
 }
 
 export function buildServer(deps: ServerDeps): McpServer {
@@ -156,6 +167,32 @@ export function buildServer(deps: ServerDeps): McpServer {
     async ({ itemId, actionId, confirmed }) => {
       try {
         const result = await applyAction(deps.store, itemId, actionId, { confirmed });
+        if (result.receipt !== undefined) {
+          deps.notify?.enqueue({
+            event: result.receipt.event,
+            summary: result.message,
+            entryId: result.receipt.entryId,
+            documentId: itemId,
+            ...(result.receipt.threadKey !== undefined ? { threadKey: result.receipt.threadKey } : {})
+          });
+        }
+        if (
+          result.receipt !== undefined
+          && result.action.status === "done"
+          && result.action.type === "schedule"
+          && typeof result.action.params.at === "string"
+          && deps.adapters !== undefined
+          && deps.adapterConfig?.calendar.kind === "ics"
+        ) {
+          const start = result.action.params.at;
+          const title = result.item.fields.sender ?? "Appointment";
+          trackAdapterTask(
+            publishCalendar(
+              { calendar: deps.adapters.calendar, store: deps.store },
+              { title, start }
+            )
+          );
+        }
         return {
           content: [{ type: "text", text: result.message }],
           structuredContent: { action: result.action, item: result.item, decision: result.decision }
@@ -316,7 +353,7 @@ export function buildServer(deps: ServerDeps): McpServer {
           }
           await deps.store.putItem(withLifecycle(item, "escalated", at));
         }
-        await createLedger(deps.store).append({
+        const receipt = await createLedger(deps.store).append({
           at,
           actor: "user",
           event: "escalated",
@@ -324,13 +361,62 @@ export function buildServer(deps: ServerDeps): McpServer {
           ...(threadKey !== undefined ? { threadKey } : {}),
           ...(reason !== undefined ? { details: { reason } } : {})
         });
+        const escalated = copy.escalated(preferences.trustedContactAlias);
+        deps.notify?.enqueue({ event: "escalated", summary: escalated, entryId: receipt.entryId });
         return {
-          content: [{ type: "text", text: copy.escalated(preferences.trustedContactAlias) }],
+          content: [{ type: "text", text: escalated }],
           structuredContent: { escalated: true }
         };
       } catch (err) {
         return safeError("escalate_item", err);
       }
+    }
+  );
+
+  server.tool(
+    "prepare_payment",
+    "Prepare a payment the customer completes in their own banking app. Never moves money.",
+    {
+      beneficiaryName: z.string(),
+      iban: z.string(),
+      amount: z.object({ currency: z.string(), value: z.number().nonnegative() }),
+      remittance: z.string(),
+      documentId: z.string().optional()
+    },
+    async ({ beneficiaryName, iban, amount, remittance, documentId }) => {
+      if (!ibanIsValid(iban)) {
+        return { content: [{ type: "text", text: copy.payment.invalidIban }], isError: true as const };
+      }
+      const adapters = deps.adapters ?? nullAdapters;
+      let prepared: { instruction: string; epcQr?: string; ledgerNote: string };
+      try {
+        prepared = adapters.payment.prepare({ beneficiaryName, iban, amount, remittance });
+      } catch (err) {
+        return safeError("prepare_payment", err);
+      }
+      try {
+        const at = new Date().toISOString();
+        const ledger = createLedger(deps.store);
+        const receipt = await ledger.append({
+          at,
+          actor: "agent",
+          event: "action_proposed",
+          details: { actionType: "payment_handoff" },
+          ...(documentId !== undefined ? { documentId } : {})
+        });
+        deps.notify?.enqueue({
+          event: "action_proposed",
+          summary: prepared.ledgerNote,
+          entryId: receipt.entryId,
+          ...(documentId !== undefined ? { documentId } : {})
+        });
+      } catch (err) {
+        return safeError("prepare_payment", err);
+      }
+      return {
+        content: [{ type: "text", text: prepared.epcQr !== undefined ? copy.payment.prepared : prepared.instruction }],
+        structuredContent: { instruction: prepared.instruction, ...(prepared.epcQr !== undefined ? { epcQr: prepared.epcQr } : {}) }
+      };
     }
   );
 
@@ -473,6 +559,31 @@ export function buildServer(deps: ServerDeps): McpServer {
           mimeType: "application/json",
           text: JSON.stringify({ entries, verification: verifyLedger(entries) })
         }]
+      };
+    }
+  );
+
+  server.resource(
+    "capabilities",
+    "wayfinder://capabilities",
+    { description: "What is actually wired, never what is merely possible." },
+    async (uri) => {
+      const config = deps.adapterConfig;
+      const chain = await readChain(deps.store);
+      const capabilities = buildCapabilities(
+        config ?? {
+          notifier: { kind: "null" },
+          calendar: { kind: "null" },
+          payment: { kind: "null" },
+          signature: { kind: "local" },
+          documentSource: { kind: "null" },
+          assist: { kind: "null" },
+          warnings: []
+        },
+        chain
+      );
+      return {
+        contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(capabilities) }]
       };
     }
   );
