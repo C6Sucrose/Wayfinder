@@ -6,6 +6,7 @@ import { nullAdapters } from "../../src/adapters/null.js";
 import { resolveAdapterConfig } from "../../src/adapters/config.js";
 import { buildEpcPayload, crc16ccitt, epcPayment } from "../../src/adapters/epcQr.js";
 import { buildIcs, createIcsFileSink } from "../../src/adapters/icsFileSink.js";
+import { createWebhookNotifier } from "../../src/adapters/webhookNotifier.js";
 
 describe("null adapters", () => {
   it("delivers nothing and says so without throwing", async () => {
@@ -193,5 +194,44 @@ describe("icsFileSink", () => {
     const result = await sink.publish({ title: "Dentist", start: "2026-10-01T09:00:00.000Z", durationMinutes: 60 });
     expect(result.ref.startsWith(dir)).toBe(true);
     expect(readFileSync(result.ref, "utf8")).toContain("SUMMARY:Dentist");
+  });
+});
+
+describe("webhookNotifier", () => {
+  it("refuses a non-https or non-allowlisted URL at construction", () => {
+    expect(() => createWebhookNotifier({ url: "http://hooks.example/wf", allowlist: ["http://hooks.example/wf"] })).toThrow(/https/i);
+    expect(() => createWebhookNotifier({ url: "https://hooks.example/wf", allowlist: ["https://hooks.example/other"] })).toThrow(/allowlist/i);
+  });
+
+  it("posts a redacted payload carrying the entryId", async () => {
+    const calls: Array<{ url: string; body: string }> = [];
+    const fetchImpl = (async (url: string | URL, init?: { body?: unknown }) => {
+      calls.push({ url: String(url), body: String(init?.body) });
+      return { ok: true, status: 200 } as Response;
+    }) as unknown as typeof fetch;
+    const notifier = createWebhookNotifier({ url: "https://hooks.example/wf", allowlist: ["https://hooks.example/wf"], fetchImpl });
+    const result = await notifier.notify({ entryId: "led_1", event: "action_executed", summary: "Account DE89370400440532013000 noted" });
+    expect(result).toEqual({ delivered: true, detail: "delivered" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body).toContain("led_1");
+    expect(calls[0]!.body).not.toContain("DE89370400440532013000");
+  });
+
+  it("suppresses a duplicate entryId so a retry cannot double-notify", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => { calls += 1; return { ok: true, status: 200 } as Response; }) as unknown as typeof fetch;
+    const notifier = createWebhookNotifier({ url: "https://hooks.example/wf", allowlist: ["https://hooks.example/wf"], fetchImpl });
+    await notifier.notify({ entryId: "led_1", event: "triaged", summary: "x" });
+    const second = await notifier.notify({ entryId: "led_1", event: "triaged", summary: "x" });
+    expect(second.delivered).toBe(false);
+    expect(calls).toBe(1);
+  });
+
+  it("reports a non-2xx response as a failure without throwing", async () => {
+    const fetchImpl = (async () => ({ ok: false, status: 500 } as Response)) as unknown as typeof fetch;
+    const notifier = createWebhookNotifier({ url: "https://hooks.example/wf", allowlist: ["https://hooks.example/wf"], fetchImpl });
+    const result = await notifier.notify({ event: "triaged", summary: "x" });
+    expect(result.delivered).toBe(false);
+    expect(result.detail).toContain("500");
   });
 });
