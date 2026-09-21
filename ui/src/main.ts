@@ -47,7 +47,7 @@ async function confirmAction(button: HTMLButtonElement): Promise<void> {
       arguments: { itemId: pending.itemId, actionId: pending.actionId, confirmed: true }
     });
     pendingAction = undefined;
-    current = { ...current, toolName: "act_on_item", result: res.structuredContent };
+    current = { ...current, toolName: "act_on_item", result: res.isError || res.structuredContent === undefined ? { failed: true } : res.structuredContent };
   } catch (err) {
     console.error("[view] action failed:", err);
     pendingAction = undefined;
