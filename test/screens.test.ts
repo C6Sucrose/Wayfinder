@@ -108,6 +108,125 @@ describe("renderScreen: daily_briefing", () => {
   });
 });
 
+describe("renderScreen: get_backlog", () => {
+  const entry = {
+    thread: {
+      threadKey: "t1",
+      sender: "City Water",
+      demandType: "payment",
+      documentIds: ["d1", "d2"],
+      firstSeenAt: "2026-09-01T00:00:00.000Z",
+      lastSeenAt: "2026-09-18T00:00:00.000Z",
+      reminderCount: 2,
+      urgency: "high",
+      outstanding: true
+    },
+    documents: [{ itemId: "d1" }, { itemId: "d2" }],
+    deadline: "2026-09-22"
+  };
+
+  it("renders each thread with sender, demand, urgency, reminders, and deadline", () => {
+    const html = renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [entry] } });
+    expect(html).toContain('<section class="grid">');
+    expect(html).toContain("City Water · payment");
+    expect(html).toContain("high urgency");
+    expect(html).toContain("due 2026-09-22");
+    expect(html).toContain("2 reminder(s)");
+    expect(html).toContain("2 document(s)");
+    expect(html).toContain("card--alert");
+  });
+
+  it("treats a missing demand type as a document and gives low urgency no tone", () => {
+    const quiet = {
+      thread: { sender: "Council", demandType: "none", urgency: "low", reminderCount: 0 },
+      documents: []
+    };
+    const html = renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [quiet] } });
+    expect(html).toContain("Council · document");
+    expect(html).toContain("low urgency");
+    expect(html).not.toContain("card--alert");
+    expect(html).not.toContain("card--info");
+  });
+
+  it("escapes hostile thread text", () => {
+    const hostile = {
+      thread: { sender: "<img src=x onerror=alert(1)>", demandType: "payment", urgency: "medium", reminderCount: 0 },
+      documents: []
+    };
+    const html = renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [hostile] } });
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).not.toContain("<img");
+  });
+
+  it("renders an empty state when there is no backlog", () => {
+    expect(renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [] } })).toBe(
+      '<p class="empty">Nothing is waiting on you right now.</p>'
+    );
+  });
+});
+
+describe("renderScreen: get_audit", () => {
+  const entries = [
+    { seq: 1, at: "2026-09-20T12:00:00.000Z", actor: "agent", event: "ingested" },
+    { seq: 2, at: "2026-09-20T12:01:00.000Z", actor: "user", event: "action_confirmed" }
+  ];
+
+  it("renders an event timeline with sequence, time, and actor", () => {
+    const html = renderScreen({ toolName: "get_audit", arguments: {}, result: { entries } });
+    expect(html).toContain('<ol class="timeline">');
+    expect(html).toContain("ingested");
+    expect(html).toContain("action_confirmed");
+    expect(html).toContain("#1");
+    expect(html).toContain("user");
+  });
+
+  it("escapes hostile event text", () => {
+    const html = renderScreen({
+      toolName: "get_audit",
+      arguments: {},
+      result: { entries: [{ seq: 1, event: "<script>alert(1)</script>" }] }
+    });
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).not.toContain("<script>");
+  });
+
+  it("renders an empty state with no history", () => {
+    expect(renderScreen({ toolName: "get_audit", arguments: {}, result: { entries: [] } })).toBe(
+      '<p class="empty">I have no record of that.</p>'
+    );
+  });
+});
+
+describe("renderScreen: verify_ledger", () => {
+  it("renders a verified badge with the entry count and terminal hash", () => {
+    const html = renderScreen({
+      toolName: "verify_ledger",
+      arguments: {},
+      result: { ok: true, entries: 2, terminal: "abc123" }
+    });
+    expect(html).toContain("badge--ok");
+    expect(html).toContain("Chain verified");
+    expect(html).toContain("2 entries");
+    expect(html).toContain("abc123");
+  });
+
+  it("renders a tampered badge with the first mismatching sequence", () => {
+    const html = renderScreen({
+      toolName: "verify_ledger",
+      arguments: {},
+      result: { ok: false, entries: 2, firstMismatchSeq: 2 }
+    });
+    expect(html).toContain("badge--bad");
+    expect(html).toContain("Entry 2 was changed");
+  });
+
+  it("renders an empty state when there is no result", () => {
+    expect(renderScreen({ toolName: "verify_ledger", arguments: {}, result: {} })).toBe(
+      '<p class="empty">Nothing to verify yet.</p>'
+    );
+  });
+});
+
 describe("renderScreen: identify_product", () => {
   it("renders an escaped name, label, and disclaimer", () => {
     const html = renderScreen({
@@ -166,6 +285,87 @@ describe("renderScreen: act_on_item", () => {
     expect(html).toContain("Pay · done");
     expect(html).toContain("card--info");
     expect(html).toContain("Paid &lt;bill&gt;");
+  });
+
+  it("shows an escalate decision as a status card with no escalate button", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: { decision: "escalate", message: "I can't read this reliably; I'll ask your trusted contact to help.", item: { itemId: "itm_x" } }
+    });
+    expect(html).toContain("Needs help");
+    expect(html).toContain("I can&#39;t read this reliably");
+    expect(html).not.toContain('class="escalate"');
+  });
+
+  it("renders a failure state for a failed action", () => {
+    expect(renderScreen({ toolName: "act_on_item", arguments: {}, result: { failed: true } })).toBe(
+      '<p class="empty">I couldn\'t do that — please choose the action again.</p>'
+    );
+  });
+});
+
+describe("renderScreen: refusal card", () => {
+  it("shows the refusal reason and an escalate affordance", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: {
+        decision: "refuse",
+        message: "You have not allowed me to discard document.",
+        action: { type: "discard", status: "proposed" },
+        item: { itemId: "itm_ref", readAloudText: "Old bill" }
+      }
+    });
+    expect(html).toContain("card--alert");
+    expect(html).toContain("You have not allowed me to discard document.");
+    expect(html).toContain('class="escalate"');
+    expect(html).toContain('data-document-id="itm_ref"');
+    expect(html).not.toContain("card--info");
+  });
+
+  it("escapes hostile refusal text and item ids", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: { decision: "refuse", message: "<b>no</b>", item: { itemId: '"><img src=x>' } }
+    });
+    expect(html).toContain("&lt;b&gt;no&lt;/b&gt;");
+    expect(html).toContain('data-document-id="&quot;&gt;&lt;img src=x&gt;"');
+    expect(html).not.toContain("<img");
+  });
+
+  it("still renders an executed action as an info card", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: { decision: "allow", action: { type: "Pay", status: "done" }, item: { readAloudText: "Paid" } }
+    });
+    expect(html).toContain("Pay · done");
+    expect(html).toContain("card--info");
+  });
+});
+
+describe("renderScreen: escalation result", () => {
+  it("confirms the escalation with the contact alias", () => {
+    const html = renderScreen({
+      toolName: "escalate_item",
+      arguments: {},
+      result: { escalated: true, alias: "Priya" }
+    });
+    expect(html).toContain("Escalated");
+    expect(html).toContain("I've asked Priya to help with that.");
+  });
+
+  it("falls back when the alias is missing", () => {
+    const html = renderScreen({ toolName: "escalate_item", arguments: {}, result: { escalated: true } });
+    expect(html).toContain("your trusted contact");
+  });
+
+  it("reports a failure when the escalation failed", () => {
+    expect(renderScreen({ toolName: "escalate_item", arguments: {}, result: { failed: true } })).toBe(
+      '<p class="empty">I couldn\'t reach your trusted contact.</p>'
+    );
   });
 });
 

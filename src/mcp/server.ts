@@ -160,10 +160,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "act_on_item",
-    "Carry out one of the suggested actions for an item after the customer confirms it.",
-    { itemId: z.string(), actionId: z.string(), confirmed: z.boolean().default(false) },
+    {
+      description: "Carry out one of the suggested actions for an item after the customer confirms it.",
+      inputSchema: { itemId: z.string(), actionId: z.string(), confirmed: z.boolean().default(false) },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ itemId, actionId, confirmed }) => {
       try {
         const result = await applyAction(deps.store, itemId, actionId, { confirmed });
@@ -195,7 +199,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         }
         return {
           content: [{ type: "text", text: result.message }],
-          structuredContent: { action: result.action, item: result.item, decision: result.decision }
+          structuredContent: { action: result.action, item: result.item, decision: result.decision, message: result.message }
         };
       } catch (err) {
         return safeError("act_on_item", err, copy.toolFailed);
@@ -251,10 +255,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "get_backlog",
-    "Rank what needs attention by urgency, with outstanding demands and related documents.",
-    { date: z.string().optional() },
+    {
+      description: "Rank what needs attention by urgency, with outstanding demands and related documents.",
+      inputSchema: { date: z.string().optional() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ date }) => {
       if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return { content: [{ type: "text", text: copy.invalidDate }], isError: true as const };
@@ -273,10 +281,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "get_audit",
-    "Explain what happened to a document or thread, from the record.",
-    { documentId: z.string().optional(), threadKey: z.string().optional() },
+    {
+      description: "Explain what happened to a document or thread, from the record.",
+      inputSchema: { documentId: z.string().optional(), threadKey: z.string().optional() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ documentId, threadKey }) => {
       if (documentId === undefined && threadKey === undefined) {
         return { content: [{ type: "text", text: copy.audit.empty }], structuredContent: { entries: [] } };
@@ -295,10 +307,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "verify_ledger",
-    "Prove the record has not been altered since it was written.",
-    {},
+    {
+      description: "Prove the record has not been altered since it was written.",
+      inputSchema: {},
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async () => {
       try {
         const entries = await createLedger(deps.store).read();
@@ -365,7 +381,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         deps.notify?.enqueue({ event: "escalated", summary: escalated, entryId: receipt.entryId });
         return {
           content: [{ type: "text", text: escalated }],
-          structuredContent: { escalated: true }
+          structuredContent: { escalated: true, alias: preferences.trustedContactAlias }
         };
       } catch (err) {
         return safeError("escalate_item", err);
