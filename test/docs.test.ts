@@ -19,9 +19,21 @@ describe("public documentation", () => {
       expect(md, heading).toContain(heading);
     }
     expect(md).toContain("docs/index.html");
-    expect(md).toContain("```mermaid");
-    // Labels render as SVG text so host CSS cannot clip the node boxes.
-    expect(md).toContain('"htmlLabels": false');
+    expect(md).toContain("docs/diagrams/architecture.svg");
+    expect(md).toContain("docs/diagrams/authority.svg");
+    // Diagrams are hand-authored SVG so no renderer can clip a label.
+    expect(md).not.toContain("```mermaid");
+  });
+
+  it("ships accessible SVG diagrams", () => {
+    for (const file of ["docs/diagrams/architecture.svg", "docs/diagrams/authority.svg"]) {
+      const svg = read(file);
+      expect(svg, file).toMatch(/^<svg[\s>]/);
+      expect(svg, file).toContain('role="img"');
+      expect(svg, file).toContain("<title");
+      expect(svg, file).toContain('viewBox="');
+      expect(svg, file).not.toMatch(/<script/i);
+    }
   });
 
   it("ships a self-contained interactive page", () => {
@@ -40,7 +52,13 @@ describe("public documentation", () => {
   });
 
   it("leaks no account identifiers into the public docs", () => {
-    const haystack = [read("README.md"), read("docs/index.html"), read("docs/demo-script.md")].join("\n");
+    const haystack = [
+      read("README.md"),
+      read("docs/index.html"),
+      read("docs/demo-script.md"),
+      read("docs/diagrams/architecture.svg"),
+      read("docs/diagrams/authority.svg")
+    ].join("\n");
     for (const secret of ["958452485624", "L-F4DDD3EB", "L-58BE175A", "arn:aws:"]) {
       expect(haystack, secret).not.toContain(secret);
     }

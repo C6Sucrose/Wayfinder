@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](package.json)
-[![Tests](https://img.shields.io/badge/tests-385%20passing-success.svg)](#development)
+[![Tests](https://img.shields.io/badge/tests-386%20passing-success.svg)](#development)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6.svg)](tsconfig.json)
 [![MCP](https://img.shields.io/badge/MCP-server-6b4fbb.svg)](https://modelcontextprotocol.io)
 
@@ -50,17 +50,7 @@ Perception (reading a letter, a bill, a label) is an *input*. The product is the
 
 ### How a request flows
 
-```mermaid
-%%{init: {"flowchart": {"htmlLabels": false}}}%%
-flowchart TD
-  U["Voice or text"] --> HOST["Host client"]
-  HOST --> BRAIN["Agent brain"]
-  BRAIN --> SERVER["Wayfinder MCP server"]
-  SERVER --> DOMAIN["Domain: correlate, authority, ledger"]
-  DOMAIN --> STORE[("Local store")]
-  SERVER --> VIEW["MCP App view"]
-  SERVER -. off the request path .-> ADAPTERS["Optional adapters"]
-```
+![How a request flows: voice or text reaches the host client, which calls the agent brain over MCP tools; the brain drives the Wayfinder MCP server, which runs domain logic (correlate, authority, ledger) over a local store; the server returns MCP resources to the host, which renders the sandboxed MCP App view; optional adapters run off the request path.](docs/diagrams/architecture.svg)
 
 ## Who it is for
 
@@ -120,20 +110,7 @@ Without `BEDROCK_MODEL_ID` the server uses a deterministic **rule brain** that r
 
 Every action is governed before it happens:
 
-```mermaid
-%%{init: {"flowchart": {"htmlLabels": false}}}%%
-flowchart TD
-  A["Action proposed"] --> B{"Forbidden by you?"}
-  B -->|"yes"| R["Refuse, speak the reason, record action_refused"]
-  B -->|"no"| C{"Read with low confidence?"}
-  C -->|"yes"| D["Ask, refuse, or escalate, per your policy"]
-  C -->|"no"| E{"Above your auto-act limit?"}
-  E -->|"yes"| F["Ask you to confirm"]
-  E -->|"no"| G["Act"]
-  F -->|"you confirm"| H["Act and record action_confirmed"]
-  G --> I["Record action_executed"]
-  H --> I
-```
+![How the authority envelope governs an action: a proposed action is refused if its type is forbidden; a low-confidence read asks, refuses, or escalates per policy; an amount above the auto-act limit requires confirmation; actions within limits are performed and recorded.](docs/diagrams/authority.svg)
 
 Refusals are first-class: the reason is spoken and written to the ledger, and the response offers escalation to your trusted contact.
 

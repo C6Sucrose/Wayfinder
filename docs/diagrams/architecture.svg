@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 660" width="760" height="660" role="img" aria-labelledby="wf-arch-title wf-arch-desc">
+  <title id="wf-arch-title">How a request flows through Wayfinder</title>
+  <desc id="wf-arch-desc">Voice or text reaches the host client, which calls the agent brain over MCP tools. The brain drives the Wayfinder MCP server, which runs the domain logic (correlate, authority, ledger) over a local store. The server returns MCP resources to the host, which renders the sandboxed MCP App view. Optional adapters run off the request path.</desc>
+  <defs>
+    <marker id="wf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9a948a"/>
+    </marker>
+    <style>
+      .wf-box { fill: #ffffff; stroke: #c9c3b8; stroke-width: 1.5; }
+      .wf-term { fill: #e8f0ff; stroke: #1f5fd6; stroke-width: 1.5; }
+      .wf-store { fill: #f3f1ec; stroke: #c9c3b8; stroke-width: 1.5; }
+      .wf-adapter { fill: #faf9f6; stroke: #b7b1a6; stroke-width: 1.5; stroke-dasharray: 6 5; }
+      .wf-t { fill: #17161a; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; font-weight: 600; }
+      .wf-s { fill: #5d5a55; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 12px; }
+      .wf-e { stroke: #9a948a; stroke-width: 1.6; fill: none; marker-end: url(#wf-arrow); }
+      .wf-l { fill: #6b665e; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 11.5px; }
+    </style>
+  </defs>
+
+  <rect x="0.75" y="0.75" width="758.5" height="658.5" rx="16" fill="#ffffff" stroke="#e4e0d8" stroke-width="1.5"/>
+
+  <g>
+    <rect class="wf-term" x="70" y="36" width="340" height="64" rx="32"/>
+    <text class="wf-t" x="240" y="74" text-anchor="middle">Voice or text</text>
+  </g>
+  <g>
+    <rect class="wf-box" x="70" y="140" width="340" height="64" rx="12"/>
+    <text class="wf-t" x="240" y="178" text-anchor="middle">Host client</text>
+  </g>
+  <g>
+    <rect class="wf-box" x="70" y="244" width="340" height="64" rx="12"/>
+    <text class="wf-t" x="240" y="282" text-anchor="middle">Agent brain</text>
+  </g>
+  <g>
+    <rect class="wf-box" x="70" y="348" width="340" height="64" rx="12"/>
+    <text class="wf-t" x="240" y="386" text-anchor="middle">Wayfinder MCP server</text>
+  </g>
+  <g>
+    <rect class="wf-box" x="70" y="452" width="340" height="78" rx="12"/>
+    <text class="wf-t" x="240" y="482" text-anchor="middle">Domain</text>
+    <text class="wf-s" x="240" y="504" text-anchor="middle">correlate &middot; authority &middot; ledger</text>
+  </g>
+  <g>
+    <rect class="wf-store" x="70" y="570" width="340" height="64" rx="12"/>
+    <ellipse cx="240" cy="582" rx="150" ry="7" fill="none" stroke="#c9c3b8" stroke-width="1.2"/>
+    <text class="wf-t" x="240" y="614" text-anchor="middle">Local store</text>
+  </g>
+
+  <g>
+    <rect class="wf-box" x="470" y="316" width="230" height="78" rx="12"/>
+    <text class="wf-t" x="585" y="346" text-anchor="middle">MCP App view</text>
+    <text class="wf-s" x="585" y="368" text-anchor="middle">sandboxed iframe</text>
+  </g>
+  <g>
+    <rect class="wf-adapter" x="470" y="420" width="230" height="78" rx="12"/>
+    <text class="wf-t" x="585" y="450" text-anchor="middle">Optional adapters</text>
+    <text class="wf-s" x="585" y="472" text-anchor="middle">off the request path</text>
+  </g>
+
+  <path class="wf-e" d="M240 100 V140"/>
+  <path class="wf-e" d="M240 204 V244"/>
+  <path class="wf-e" d="M240 308 V348"/>
+  <path class="wf-e" d="M240 412 V452"/>
+  <path class="wf-e" d="M240 530 V570"/>
+
+  <path class="wf-e" d="M410 380 H440 V355 H470"/>
+  <path class="wf-e" d="M410 380 H440 V459 H470"/>
+  <text class="wf-l" x="446" y="371">view</text>
+  <text class="wf-l" x="446" y="476">invoke</text>
+</svg>
