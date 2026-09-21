@@ -18,4 +18,5 @@ Rules: writes only under the configured directory; each event is a self-containe
 random UID so a retry cannot overwrite an existing event; no network access; no secrets in the event
 text. HTTPS, allowlist, and timeout do not apply because delivery is local; redaction still applies.
 
-Verify: `npm run adapters:conformance`
+Verify: `npm run adapters:conformance` (validates wiring and the offline calendar contract against a
+temporary directory; it never writes to your configured calendar directory).
