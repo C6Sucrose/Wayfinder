@@ -106,6 +106,21 @@ describe("listItems filters", () => {
   });
 });
 
+describe("lifecycle-based filters", () => {
+  it("excludes confirmed and closed records from unresolved", async () => {
+    await store.putItem(mkItem({ itemId: "itm_open" }));
+    await store.putItem(mkItem({ itemId: "itm_confirmed", record: { lifecycle: "confirmed", confidence: "high", needsRecapture: false, demands: [], threadKey: "t" } }));
+    await store.putItem(mkItem({ itemId: "itm_closed", record: { lifecycle: "closed", confidence: "high", needsRecapture: false, demands: [], threadKey: "t" } }));
+    expect((await store.listItems("unresolved")).map((i) => i.itemId)).toEqual(["itm_open"]);
+  });
+
+  it("excludes confirmed records from due", async () => {
+    await store.putItem(mkItem({ itemId: "itm_due", fields: { dueDate: "2020-01-01" } }));
+    await store.putItem(mkItem({ itemId: "itm_done", fields: { dueDate: "2020-01-01" }, record: { lifecycle: "confirmed", confidence: "high", needsRecapture: false, demands: [], threadKey: "t" } }));
+    expect((await store.listItems("due")).map((i) => i.itemId)).toEqual(["itm_due"]);
+  });
+});
+
 describe("resilience", () => {
   it("skips a corrupt item file instead of aborting the listing", async () => {
     await store.putItem(mkItem({ itemId: "itm_ok" }));
