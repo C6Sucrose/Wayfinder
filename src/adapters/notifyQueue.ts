@@ -20,13 +20,12 @@ export interface NotifyQueue {
 
 export function createNotifyQueue(deps: { notifier: Notifier; store: Store }): NotifyQueue {
   const ledger = createLedger(deps.store);
-  const pending: NotifyJob[] = [];
-  let active: Promise<void> | null = null;
+  let tail: Promise<void> = Promise.resolve();
 
   const deliver = async (job: NotifyJob): Promise<void> => {
-    const summary = redactSensitive(job.summary);
     let delivered = false;
     try {
+      const summary = redactSensitive(job.summary);
       const result = await deps.notifier.notify({
         event: job.event,
         summary,
@@ -57,25 +56,22 @@ export function createNotifyQueue(deps: { notifier: Notifier; store: Store }): N
     }
   };
 
-  const pump = async (): Promise<void> => {
-    while (pending.length > 0) {
-      const job = pending.shift()!;
-      await deliver(job);
-    }
-  };
-
   return {
     enqueue(job) {
-      pending.push(job);
-      if (!active) {
-        active = pump().finally(() => { active = null; });
-      }
+      tail = tail.then(() => deliver(job)).catch((err) => {
+        console.error("[notifyQueue] delivery task failed:", err);
+      });
     },
     async drain() {
-      while (active) await active;
+      let current = tail;
+      await current;
+      while (current !== tail) {
+        current = tail;
+        await current;
+      }
     },
     async close() {
-      await active;
+      await tail;
     }
   };
 }

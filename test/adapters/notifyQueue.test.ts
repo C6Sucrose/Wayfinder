@@ -44,4 +44,18 @@ describe("notifyQueue", () => {
     await queue.drain();
     expect((await store.listLedger()).map((e) => e.event)).toEqual(["delivery_failed"]);
   });
+
+  it("does not strand a job enqueued while a delivery is in flight", async () => {
+    const seen: string[] = [];
+    const notifier: Notifier = {
+      async notify(input) { await Promise.resolve(); seen.push(input.summary); return { delivered: true, detail: "ok" }; }
+    };
+    const queue = createNotifyQueue({ notifier, store });
+    queue.enqueue({ event: "triaged", summary: "one" });
+    await Promise.resolve();
+    queue.enqueue({ event: "triaged", summary: "two" });
+    await queue.drain();
+    expect(seen).toEqual(["one", "two"]);
+    expect((await store.listLedger()).map((e) => e.event)).toEqual(["external_invoked", "external_invoked"]);
+  });
 });
