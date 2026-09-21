@@ -12,7 +12,6 @@
       .a-alert { fill: #fdece9; stroke: #8a1f11; stroke-width: 1.5; }
       .a-ok { fill: #e6f5ec; stroke: #14653a; stroke-width: 1.5; }
       .a-t { fill: #17161a; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; font-weight: 600; }
-      .a-s { fill: #4a463f; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; }
       .a-e { stroke: #9a948a; stroke-width: 1.6; fill: none; marker-end: url(#wf-arrow2); }
       .a-l { fill: #6b665e; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 11.5px; font-weight: 600; }
       .a-d { fill: #1f5fd6; }
@@ -33,8 +32,8 @@
   </g>
   <g>
     <rect class="a-alert" x="430" y="130" width="350" height="64" rx="12"/>
-    <text class="a-s" x="605" y="158" text-anchor="middle">Refuse, speak the reason,</text>
-    <text class="a-s" x="605" y="178" text-anchor="middle">record action_refused</text>
+    <text class="a-t" x="605" y="158" text-anchor="middle">Refuse, speak the reason,</text>
+    <text class="a-t" x="605" y="178" text-anchor="middle">record action_refused</text>
   </g>
 
   <g>
@@ -44,8 +43,8 @@
   </g>
   <g>
     <rect class="a-box" x="430" y="230" width="350" height="64" rx="12"/>
-    <text class="a-s" x="605" y="258" text-anchor="middle">Ask, refuse, or escalate,</text>
-    <text class="a-s" x="605" y="278" text-anchor="middle">per your policy</text>
+    <text class="a-t" x="605" y="258" text-anchor="middle">Ask, refuse, or escalate,</text>
+    <text class="a-t" x="605" y="278" text-anchor="middle">per your policy</text>
   </g>
 
   <g>
