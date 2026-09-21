@@ -1,5 +1,5 @@
 import type { Store } from "../storage/types.js";
-import type { Action, Item } from "./model.js";
+import type { Action, Item, LedgerEntry } from "./model.js";
 import { copy } from "./copy.js";
 import { DEFAULT_AUTHORITY, evaluateAuthority, type AuthorityDecision } from "./authority.js";
 import { toDocumentRecord } from "./correlation.js";
@@ -11,6 +11,7 @@ export interface ApplyResult {
   action: Action;
   message: string;
   decision: AuthorityDecision;
+  receipt?: LedgerEntry;
 }
 
 export interface ApplyOptions {
@@ -56,7 +57,7 @@ export async function applyAction(
   const now = new Date().toISOString();
 
   if (verdict.decision === "refuse" || verdict.decision === "escalate") {
-    await ledger.append({
+    const receipt = await ledger.append({
       at: now,
       actor: "agent",
       event: verdict.decision === "escalate" ? "escalated" : "action_refused",
@@ -64,11 +65,11 @@ export async function applyAction(
       threadKey: record.record.threadKey,
       details: { actionType: action.type, reason: verdict.reason }
     });
-    return { item, action, message: verdict.reason, decision: verdict.decision };
+    return { item, action, message: verdict.reason, decision: verdict.decision, receipt };
   }
 
   if (verdict.decision === "confirm" && options.confirmed !== true) {
-    await ledger.append({
+    const receipt = await ledger.append({
       at: now,
       actor: "agent",
       event: "action_proposed",
@@ -76,7 +77,7 @@ export async function applyAction(
       threadKey: record.record.threadKey,
       details: { actionType: action.type, reason: verdict.reason }
     });
-    return { item, action, message: verdict.reason, decision: "confirm" };
+    return { item, action, message: verdict.reason, decision: "confirm", receipt };
   }
 
   let message: string;
@@ -92,10 +93,10 @@ export async function applyAction(
       break;
   }
 
-  await ledger.append({
+  const receipt = await ledger.append({
     at: now,
     actor: verdict.decision === "allow" ? "agent" : "user",
-    event: "action_confirmed",
+    event: verdict.decision === "allow" ? "action_executed" : "action_confirmed",
     documentId: item.itemId,
     threadKey: record.record.threadKey,
     details: { actionType: action.type }
@@ -125,5 +126,5 @@ export async function applyAction(
     }
     throw err;
   }
-  return { item: updatedItem, action: done, message, decision: verdict.decision };
+  return { item: updatedItem, action: done, message, decision: verdict.decision, receipt };
 }

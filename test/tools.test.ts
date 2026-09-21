@@ -164,7 +164,7 @@ describe("resources and prompt", () => {
       fields: {}, proposedActions: [], createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null
     });
     const list = await client.listResources();
-    expect(list.resources.map((r) => r.uri).sort()).toEqual([APP_RESOURCE_URI, "wayfinder://inbox", "wayfinder://ledger", "wayfinder://objects"]);
+    expect(list.resources.map((r) => r.uri).sort()).toEqual([APP_RESOURCE_URI, "wayfinder://capabilities", "wayfinder://inbox", "wayfinder://ledger", "wayfinder://objects"]);
     const read = await client.readResource({ uri: "wayfinder://inbox" });
     expect(JSON.stringify(read.contents)).toContain("itm_i");
     await client.close();

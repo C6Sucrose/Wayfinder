@@ -83,7 +83,9 @@ describe("applyAction authority gate", () => {
     const stored = await store.getItem("itm_a");
     expect(stored?.record?.lifecycle).toBe("awaiting_action");
     expect(stored?.proposedActions[0]?.status).toBe("proposed");
-    expect((await store.listLedger()).map((e) => e.event)).not.toContain("action_confirmed");
+    const events = (await store.listLedger()).map((e) => e.event);
+    expect(events).not.toContain("action_confirmed");
+    expect(events).not.toContain("action_executed");
   });
 
   it("records the receipt as an agent action when authority allows it automatically", async () => {
@@ -91,7 +93,7 @@ describe("applyAction authority gate", () => {
     await withAuthority();
     const result = await applyAction(store, "itm_a", "itm_a:remind");
     expect(result.decision).toBe("allow");
-    const entry = (await store.listLedger()).find((e) => e.event === "action_confirmed");
+    const entry = (await store.listLedger()).find((e) => e.event === "action_executed");
     expect(entry?.actor).toBe("agent");
   });
 
