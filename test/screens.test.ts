@@ -286,6 +286,23 @@ describe("renderScreen: act_on_item", () => {
     expect(html).toContain("card--info");
     expect(html).toContain("Paid &lt;bill&gt;");
   });
+
+  it("shows an escalate decision as a status card with no escalate button", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: { decision: "escalate", message: "I can't read this reliably; I'll ask your trusted contact to help.", item: { itemId: "itm_x" } }
+    });
+    expect(html).toContain("Needs help");
+    expect(html).toContain("I can&#39;t read this reliably");
+    expect(html).not.toContain('class="escalate"');
+  });
+
+  it("renders a failure state for a failed action", () => {
+    expect(renderScreen({ toolName: "act_on_item", arguments: {}, result: { failed: true } })).toBe(
+      '<p class="empty">I couldn\'t do that — please choose the action again.</p>'
+    );
+  });
 });
 
 describe("renderScreen: refusal card", () => {
