@@ -7,6 +7,7 @@ import { resolveAdapterConfig } from "../../src/adapters/config.js";
 import { buildEpcPayload, crc16ccitt, epcPayment } from "../../src/adapters/epcQr.js";
 import { buildIcs, createIcsFileSink } from "../../src/adapters/icsFileSink.js";
 import { createWebhookNotifier } from "../../src/adapters/webhookNotifier.js";
+import { createAdapters } from "../../src/adapters/registry.js";
 
 describe("null adapters", () => {
   it("delivers nothing and says so without throwing", async () => {
@@ -233,5 +234,26 @@ describe("webhookNotifier", () => {
     const result = await notifier.notify({ event: "triaged", summary: "x" });
     expect(result.delivered).toBe(false);
     expect(result.detail).toContain("500");
+  });
+});
+
+describe("createAdapters", () => {
+  it("returns the null bundle when nothing is configured", () => {
+    const bundle = createAdapters(resolveAdapterConfig({}));
+    expect(bundle.notifier).toBe(nullAdapters.notifier);
+    expect(bundle.calendar).toBe(nullAdapters.calendar);
+    expect(bundle.payment).toBe(nullAdapters.payment);
+    expect(bundle.signature).toBe(nullAdapters.signature);
+  });
+
+  it("wires the EPC payment handoff when configured", () => {
+    const bundle = createAdapters(resolveAdapterConfig({ WAYFINDER_ADAPTER_PAYMENT: "epc" }));
+    const result = bundle.payment.prepare({
+      amount: { currency: "EUR", value: 9.99 },
+      beneficiaryName: "City Water",
+      iban: "DE89370400440532013000",
+      remittance: "INV-1"
+    });
+    expect(result.epcQr).toBeDefined();
   });
 });
