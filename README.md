@@ -51,15 +51,15 @@ Perception (reading a letter, a bill, a label) is an *input*. The product is the
 ### How a request flows
 
 ```mermaid
-flowchart LR
-  U[Voice or text] --> HOST[Host client]
-  HOST -->|MCP tools| BRAIN[Agent brain]
-  BRAIN --> SERVER[Wayfinder MCP server]
-  SERVER --> DOMAIN[Domain: correlate, authority, ledger]
-  DOMAIN --> STORE[(Local store)]
-  SERVER -->|MCP resources| HOST
-  SERVER -. off the request path .-> ADAPTERS[Optional adapters]
-  HOST --> VIEW[Sandboxed MCP App view]
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
+flowchart TD
+  U["Voice or text"] --> HOST["Host client"]
+  HOST --> BRAIN["Agent brain"]
+  BRAIN --> SERVER["Wayfinder MCP server"]
+  SERVER --> DOMAIN["Domain: correlate, authority, ledger"]
+  DOMAIN --> STORE[("Local store")]
+  SERVER --> VIEW["MCP App view"]
+  SERVER -. off the request path .-> ADAPTERS["Optional adapters"]
 ```
 
 ## Who it is for
@@ -121,16 +121,17 @@ Without `BEDROCK_MODEL_ID` the server uses a deterministic **rule brain** that r
 Every action is governed before it happens:
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart TD
-  A[Action proposed] --> B{Forbidden by you?}
-  B -->|yes| R[Refuse, speak the reason, record action_refused]
-  B -->|no| C{Read with low confidence?}
-  C -->|yes| D[Ask, refuse, or escalate, per your policy]
-  C -->|no| E{Above your auto-act limit?}
-  E -->|yes| F[Ask you to confirm]
-  E -->|no| G[Act]
-  F -->|you confirm| H[Act and record action_confirmed]
-  G --> I[Record action_executed]
+  A["Action proposed"] --> B{"Forbidden by you?"}
+  B -->|"yes"| R["Refuse, speak the reason, record action_refused"]
+  B -->|"no"| C{"Read with low confidence?"}
+  C -->|"yes"| D["Ask, refuse, or escalate, per your policy"]
+  C -->|"no"| E{"Above your auto-act limit?"}
+  E -->|"yes"| F["Ask you to confirm"]
+  E -->|"no"| G["Act"]
+  F -->|"you confirm"| H["Act and record action_confirmed"]
+  G --> I["Record action_executed"]
   H --> I
 ```
 

@@ -20,6 +20,8 @@ describe("public documentation", () => {
     }
     expect(md).toContain("docs/index.html");
     expect(md).toContain("```mermaid");
+    // Labels render as SVG text so host CSS cannot clip the node boxes.
+    expect(md).toContain('"htmlLabels": false');
   });
 
   it("ships a self-contained interactive page", () => {
