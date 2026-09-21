@@ -10,6 +10,7 @@ import { createHttpApp } from "../src/server/http.js";
 import { createAdapters } from "../src/adapters/registry.js";
 import { resolveAdapterConfig } from "../src/adapters/config.js";
 import { createNotifyQueue } from "../src/adapters/notifyQueue.js";
+import { copy } from "../src/domain/copy.js";
 
 async function connect(env: NodeJS.ProcessEnv = {}) {
   const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-")));
@@ -85,6 +86,41 @@ describe("prepare_payment", () => {
       }
     });
     expect(res.isError).toBe(true);
+    expect((res.content as Array<{ text: string }>)[0]!.text).toBe(copy.payment.invalidIban);
+    await client.close();
+  });
+
+  it("refuses an invalid IBAN even without a payment adapter", async () => {
+    const { client } = await connect();
+    const res = await client.callTool({
+      name: "prepare_payment",
+      arguments: {
+        beneficiaryName: "City Water",
+        iban: "DE89370400440532013001",
+        amount: { currency: "EUR", value: 12.5 },
+        remittance: "INV-1"
+      }
+    });
+    expect(res.isError).toBe(true);
+    expect((res.content as Array<{ text: string }>)[0]!.text).toBe(copy.payment.invalidIban);
+    await client.close();
+  });
+
+  it("does not claim a scannable code when no payment adapter is configured", async () => {
+    const { client } = await connect();
+    const res = await client.callTool({
+      name: "prepare_payment",
+      arguments: {
+        beneficiaryName: "City Water",
+        iban: "DE89370400440532013000",
+        amount: { currency: "EUR", value: 12.5 },
+        remittance: "INV-1"
+      }
+    });
+    expect(res.isError).not.toBe(true);
+    const sc = res.structuredContent as { epcQr?: string };
+    expect(sc.epcQr).toBeUndefined();
+    expect((res.content as Array<{ text: string }>)[0]!.text.toLowerCase()).not.toContain("scan");
     await client.close();
   });
 

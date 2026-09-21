@@ -15,6 +15,7 @@ import { buildBacklog, describeThread, type BacklogEntry } from "../domain/backl
 import { createLedger } from "../domain/ledgerLog.js";
 import { withLifecycle } from "../domain/lifecycle.js";
 import { buildRecordReport, verifyLedger } from "../domain/ledger.js";
+import { ibanIsValid } from "../domain/validity.js";
 import type { Item } from "../domain/model.js";
 import { buildCapabilities, readChain } from "../adapters/capabilities.js";
 import type { AdapterBundle } from "../adapters/types.js";
@@ -364,12 +365,15 @@ export function buildServer(deps: ServerDeps): McpServer {
       documentId: z.string().optional()
     },
     async ({ beneficiaryName, iban, amount, remittance, documentId }) => {
+      if (!ibanIsValid(iban)) {
+        return { content: [{ type: "text", text: copy.payment.invalidIban }], isError: true as const };
+      }
       const adapters = deps.adapters ?? nullAdapters;
       let prepared: { instruction: string; epcQr?: string; ledgerNote: string };
       try {
         prepared = adapters.payment.prepare({ beneficiaryName, iban, amount, remittance });
-      } catch {
-        return { content: [{ type: "text", text: copy.payment.invalidIban }], isError: true as const };
+      } catch (err) {
+        return safeError("prepare_payment", err);
       }
       try {
         const at = new Date().toISOString();
@@ -391,7 +395,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         return safeError("prepare_payment", err);
       }
       return {
-        content: [{ type: "text", text: copy.payment.prepared }],
+        content: [{ type: "text", text: prepared.epcQr !== undefined ? copy.payment.prepared : prepared.instruction }],
         structuredContent: { instruction: prepared.instruction, ...(prepared.epcQr !== undefined ? { epcQr: prepared.epcQr } : {}) }
       };
     }
