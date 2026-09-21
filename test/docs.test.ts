@@ -33,6 +33,8 @@ describe("public documentation", () => {
       expect(svg, file).toContain("<title");
       expect(svg, file).toContain('viewBox="');
       expect(svg, file).not.toMatch(/<script/i);
+      // SVG served as XML: only the five predefined entities, plus numeric refs.
+      expect(svg, file).not.toMatch(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/);
     }
   });
 
