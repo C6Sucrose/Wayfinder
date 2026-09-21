@@ -54,6 +54,19 @@ describe("calendar publish wiring", () => {
     );
     expect(entry).toBeDefined();
 
+    const retry = await client.callTool({
+      name: "act_on_item",
+      arguments: { itemId: "itm_sched", actionId: "itm_sched:schedule", confirmed: true }
+    });
+    expect(retry.isError).not.toBe(true);
+    await settleAdapterTasks();
+
+    expect(readdirSync(dir).filter((f) => f.endsWith(".ics"))).toHaveLength(1);
+    const calendarEntries = (await store.listLedger()).filter(
+      (e) => e.event === "external_invoked" && e.details.adapter === "calendar"
+    );
+    expect(calendarEntries).toHaveLength(1);
+
     await client.close();
   });
 });

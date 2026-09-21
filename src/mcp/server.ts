@@ -177,7 +177,8 @@ export function buildServer(deps: ServerDeps): McpServer {
           });
         }
         if (
-          result.action.status === "done"
+          result.receipt !== undefined
+          && result.action.status === "done"
           && result.action.type === "schedule"
           && typeof result.action.params.at === "string"
           && deps.adapters !== undefined
