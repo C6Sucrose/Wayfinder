@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { nullAdapters } from "../../src/adapters/null.js";
 import { resolveAdapterConfig } from "../../src/adapters/config.js";
 import { buildEpcPayload, crc16ccitt, epcPayment } from "../../src/adapters/epcQr.js";
+import { buildIcs, createIcsFileSink } from "../../src/adapters/icsFileSink.js";
 
 describe("null adapters", () => {
   it("delivers nothing and says so without throwing", async () => {
@@ -163,5 +167,31 @@ describe("epcQr", () => {
 
   it("crc16ccitt matches a known vector", () => {
     expect(crc16ccitt("123456789")).toBe("29B1");
+  });
+});
+
+describe("icsFileSink", () => {
+  it("builds a CRLF-terminated VEVENT with a 30-minute default duration", () => {
+    const ics = buildIcs({ uid: "u1", stamp: "2026-09-20T12:00:00.000Z", title: "Dentist", start: "2026-10-01T09:00:00.000Z" });
+    expect(ics).toContain("BEGIN:VCALENDAR\r\n");
+    expect(ics).toContain("UID:u1\r\n");
+    expect(ics).toContain("DTSTART:20261001T090000Z\r\n");
+    expect(ics).toContain("DTEND:20261001T093000Z\r\n");
+    expect(ics).toContain("SUMMARY:Dentist\r\n");
+    expect(ics.endsWith("END:VCALENDAR\r\n")).toBe(true);
+  });
+
+  it("escapes commas, semicolons, and newlines in text fields", () => {
+    const ics = buildIcs({ uid: "u1", stamp: "2026-09-20T12:00:00.000Z", title: "A, B; C", start: "2026-10-01T09:00:00.000Z", description: "line1\nline2" });
+    expect(ics).toContain("SUMMARY:A\\, B\\; C\r\n");
+    expect(ics).toContain("DESCRIPTION:line1\\nline2\r\n");
+  });
+
+  it("writes an .ics file and returns its path", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wf-ics-"));
+    const sink = createIcsFileSink({ dir, now: () => "2026-09-20T12:00:00.000Z" });
+    const result = await sink.publish({ title: "Dentist", start: "2026-10-01T09:00:00.000Z", durationMinutes: 60 });
+    expect(result.ref.startsWith(dir)).toBe(true);
+    expect(readFileSync(result.ref, "utf8")).toContain("SUMMARY:Dentist");
   });
 });
