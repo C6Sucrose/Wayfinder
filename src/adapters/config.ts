@@ -42,13 +42,16 @@ export function resolveAdapterConfig(
     else if (!isHttps(url)) warnings.push("The webhook notifier requires an https URL; staying null.");
     else if (!allowlist.includes(url))
       warnings.push("The webhook URL is not in WAYFINDER_WEBHOOK_ALLOWLIST; staying null.");
-    else
-      notifier = {
-        kind: "webhook",
-        url,
-        allowlist,
-        timeoutMs: Number(env.WAYFINDER_ADAPTER_TIMEOUT_MS ?? 5000)
-      };
+    else {
+      const rawTimeout = env.WAYFINDER_ADAPTER_TIMEOUT_MS;
+      let timeoutMs = 5000;
+      if (rawTimeout !== undefined && rawTimeout !== "") {
+        const parsed = Number(rawTimeout);
+        if (Number.isInteger(parsed) && parsed > 0) timeoutMs = parsed;
+        else warnings.push("WAYFINDER_ADAPTER_TIMEOUT_MS must be a positive integer; using 5000.");
+      }
+      notifier = { kind: "webhook", url, allowlist, timeoutMs };
+    }
   }
 
   const calendarKind = env.WAYFINDER_ADAPTER_CALENDAR ?? prefs?.calendar;
