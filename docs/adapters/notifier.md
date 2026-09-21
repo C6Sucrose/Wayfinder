@@ -16,4 +16,5 @@ variable wins when both are set. The URL, allowlist, and timeout still come from
 Rules: HTTPS only; exact-URL allowlist; 5 s timeout; payloads redacted; delivery keyed by `entryId` so
 retries cannot double-notify; failures append `delivery_failed`.
 
-Verify: `npm run adapters:conformance`
+Verify: `npm run adapters:conformance` (validates wiring and the offline notifier contract with a stub
+fetch; it never performs a live delivery).
