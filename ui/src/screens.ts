@@ -28,6 +28,21 @@ function itemCard(item: Record<string, unknown>): string {
   return card(`${cls}${due ? ` · due ${due}` : ""}`, `<p>${text}</p>${actions}`, tone);
 }
 
+function threadCard(entry: Record<string, unknown>): string {
+  const thread = (entry.thread ?? {}) as Record<string, unknown>;
+  const urgency = String(thread.urgency ?? "low");
+  const tone = urgency === "high" ? "alert" : urgency === "medium" ? "info" : "";
+  const sender = thread.sender ? String(thread.sender) : "Unknown sender";
+  const demand = thread.demandType && thread.demandType !== "none" ? String(thread.demandType) : "document";
+  const reminders = Number(thread.reminderCount ?? 0);
+  const documents = Array.isArray(entry.documents) ? entry.documents.length : 0;
+  const parts = [`${urgency} urgency`];
+  if (entry.deadline) parts.push(`due ${String(entry.deadline)}`);
+  if (reminders > 0) parts.push(`${reminders} reminder(s)`);
+  parts.push(`${documents} document(s)`);
+  return card(`${sender} · ${demand}`, `<p class="meta">${escape(parts.join(" · "))}</p>`, tone);
+}
+
 export function renderConfirm(action: { actionId: string; type: string }): string {
   return `<section class="confirm" role="alertdialog" aria-label="Confirm action"><p>Carry out <strong>${escape(action.type)}</strong>?</p><div class="confirm__actions"><button type="button" class="confirm__yes" data-action-id="${escape(action.actionId)}">Yes</button><button type="button" class="confirm__no">Cancel</button></div></section>`;
 }
@@ -44,6 +59,12 @@ export function renderScreen(input: ScreenInput): string {
         : `<p class="empty">Nothing to show yet.</p>`;
     case "get_item":
       return result.item ? itemCard(result.item as Record<string, unknown>) : `<p class="empty">No item.</p>`;
+    case "get_backlog": {
+      const backlog = Array.isArray(result.backlog) ? (result.backlog as Array<Record<string, unknown>>) : [];
+      return backlog.length
+        ? `<section class="grid">${backlog.map(threadCard).join("")}</section>`
+        : `<p class="empty">Nothing is waiting on you right now.</p>`;
+    }
     case "daily_briefing": {
       const due = Array.isArray(result.due) ? result.due.length : 0;
       const flagged = Array.isArray(result.flagged) ? result.flagged.length : 0;

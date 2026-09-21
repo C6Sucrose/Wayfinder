@@ -251,10 +251,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "get_backlog",
-    "Rank what needs attention by urgency, with outstanding demands and related documents.",
-    { date: z.string().optional() },
+    {
+      description: "Rank what needs attention by urgency, with outstanding demands and related documents.",
+      inputSchema: { date: z.string().optional() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ date }) => {
       if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return { content: [{ type: "text", text: copy.invalidDate }], isError: true as const };

@@ -108,6 +108,63 @@ describe("renderScreen: daily_briefing", () => {
   });
 });
 
+describe("renderScreen: get_backlog", () => {
+  const entry = {
+    thread: {
+      threadKey: "t1",
+      sender: "City Water",
+      demandType: "payment",
+      documentIds: ["d1", "d2"],
+      firstSeenAt: "2026-09-01T00:00:00.000Z",
+      lastSeenAt: "2026-09-18T00:00:00.000Z",
+      reminderCount: 2,
+      urgency: "high",
+      outstanding: true
+    },
+    documents: [{ itemId: "d1" }, { itemId: "d2" }],
+    deadline: "2026-09-22"
+  };
+
+  it("renders each thread with sender, demand, urgency, reminders, and deadline", () => {
+    const html = renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [entry] } });
+    expect(html).toContain('<section class="grid">');
+    expect(html).toContain("City Water · payment");
+    expect(html).toContain("high urgency");
+    expect(html).toContain("due 2026-09-22");
+    expect(html).toContain("2 reminder(s)");
+    expect(html).toContain("2 document(s)");
+    expect(html).toContain("card--alert");
+  });
+
+  it("treats a missing demand type as a document and gives low urgency no tone", () => {
+    const quiet = {
+      thread: { sender: "Council", demandType: "none", urgency: "low", reminderCount: 0 },
+      documents: []
+    };
+    const html = renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [quiet] } });
+    expect(html).toContain("Council · document");
+    expect(html).toContain("low urgency");
+    expect(html).not.toContain("card--alert");
+    expect(html).not.toContain("card--info");
+  });
+
+  it("escapes hostile thread text", () => {
+    const hostile = {
+      thread: { sender: "<img src=x onerror=alert(1)>", demandType: "payment", urgency: "medium", reminderCount: 0 },
+      documents: []
+    };
+    const html = renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [hostile] } });
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).not.toContain("<img");
+  });
+
+  it("renders an empty state when there is no backlog", () => {
+    expect(renderScreen({ toolName: "get_backlog", arguments: {}, result: { backlog: [] } })).toBe(
+      '<p class="empty">Nothing is waiting on you right now.</p>'
+    );
+  });
+});
+
 describe("renderScreen: identify_product", () => {
   it("renders an escaped name, label, and disclaimer", () => {
     const html = renderScreen({
