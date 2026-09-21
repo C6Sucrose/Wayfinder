@@ -9,6 +9,10 @@ import type { ScanWorker } from "../scan/worker.js";
 import type { AgentService } from "../agent/service.js";
 import { buildServer } from "../mcp/server.js";
 import { copy } from "../domain/copy.js";
+import { buildCapabilities, readChain } from "../adapters/capabilities.js";
+import type { AdapterConfig } from "../adapters/config.js";
+import type { AdapterBundle } from "../adapters/types.js";
+import type { NotifyQueue } from "../adapters/notifyQueue.js";
 
 export function isAllowedOrigin(origin: string | undefined, extra: string[]): boolean {
   if (origin === undefined || origin === "") return true; // non-browser clients omit Origin
@@ -29,6 +33,9 @@ export interface HttpDeps {
   allowedOrigins?: string[];
   worker?: ScanWorker;
   agent?: AgentService;
+  adapters?: AdapterBundle;
+  adapterConfig?: AdapterConfig;
+  notify?: NotifyQueue;
 }
 
 export function createHttpApp(deps: HttpDeps) {
@@ -48,6 +55,26 @@ export function createHttpApp(deps: HttpDeps) {
   app.use(express.json({ limit: "10mb" }));
 
   app.get("/healthz", (_req, res) => { res.json({ ok: true }); });
+
+  const fallbackConfig: AdapterConfig = {
+    notifier: { kind: "null" },
+    calendar: { kind: "null" },
+    payment: { kind: "null" },
+    signature: { kind: "local" },
+    documentSource: { kind: "null" },
+    assist: { kind: "null" },
+    warnings: []
+  };
+
+  app.get("/capabilities", async (_req, res) => {
+    try {
+      const capabilities = buildCapabilities(deps.adapterConfig ?? fallbackConfig, await readChain(deps.store));
+      res.json(capabilities);
+    } catch (err) {
+      console.error("[capabilities] failed:", err);
+      res.status(500).json({ error: copy.toolUnavailable });
+    }
+  });
 
   app.locals.notifyAll = (message: string) => {
     for (const session of sessions.values()) session.notify(message);

@@ -16,11 +16,18 @@ import { createLedger } from "../domain/ledgerLog.js";
 import { withLifecycle } from "../domain/lifecycle.js";
 import { buildRecordReport, verifyLedger } from "../domain/ledger.js";
 import type { Item } from "../domain/model.js";
+import { buildCapabilities, readChain } from "../adapters/capabilities.js";
+import type { AdapterBundle } from "../adapters/types.js";
+import type { AdapterConfig } from "../adapters/config.js";
+import type { NotifyQueue } from "../adapters/notifyQueue.js";
 
 export interface ServerDeps {
   store: Store;
   extract?: Extractor;
   worker?: ScanWorker;
+  adapters?: AdapterBundle;
+  adapterConfig?: AdapterConfig;
+  notify?: NotifyQueue;
 }
 
 export function buildServer(deps: ServerDeps): McpServer {
@@ -473,6 +480,31 @@ export function buildServer(deps: ServerDeps): McpServer {
           mimeType: "application/json",
           text: JSON.stringify({ entries, verification: verifyLedger(entries) })
         }]
+      };
+    }
+  );
+
+  server.resource(
+    "capabilities",
+    "wayfinder://capabilities",
+    { description: "What is actually wired, never what is merely possible." },
+    async (uri) => {
+      const config = deps.adapterConfig;
+      const chain = await readChain(deps.store);
+      const capabilities = buildCapabilities(
+        config ?? {
+          notifier: { kind: "null" },
+          calendar: { kind: "null" },
+          payment: { kind: "null" },
+          signature: { kind: "local" },
+          documentSource: { kind: "null" },
+          assist: { kind: "null" },
+          warnings: []
+        },
+        chain
+      );
+      return {
+        contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(capabilities) }]
       };
     }
   );

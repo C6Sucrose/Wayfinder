@@ -51,6 +51,13 @@ export const copy = {
   audit: {
     empty: "I have no record of that."
   },
+  capabilities: {
+    spoken: "Here is what is actually connected, not what could be."
+  },
+  payment: {
+    prepared: "Here is what to scan in your banking app. I have not moved any money.",
+    invalidIban: "That account number doesn't check out, so I can't prepare a payment."
+  },
   escalated: (alias: string) => `I've asked ${alias} to help with that.`,
   noTrustedContact: "I don't have a trusted contact set up.",
   escalateTarget: "Tell me which document or thread to escalate.",

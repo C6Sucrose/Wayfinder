@@ -5,6 +5,9 @@ import { createBedrockExtractor } from "../scan/bedrockExtractor.js";
 import { createMcpExecutor, type McpClientLike } from "../agent/mcpExecutor.js";
 import { createAgentService } from "../agent/service.js";
 import { scanCompleteMessage } from "../domain/scans.js";
+import { resolveAdapterConfig } from "../adapters/config.js";
+import { createAdapters } from "../adapters/registry.js";
+import { createNotifyQueue } from "../adapters/notifyQueue.js";
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -17,6 +20,11 @@ const port = Number(process.env.PORT ?? 8080);
 const host = resolveHost();
 
 const store = createFileStore(dir);
+const preferences = await store.getPreferences();
+const adapterConfig = resolveAdapterConfig(process.env, preferences.adapters);
+const adapters = createAdapters(adapterConfig);
+for (const warning of adapterConfig.warnings) console.warn(`[wayfinder] adapter: ${warning}`);
+const notify = createNotifyQueue({ notifier: adapters.notifier, store });
 const modelId = process.env.BEDROCK_MODEL_ID;
 const bedrock = modelId ? new BedrockRuntimeClient({ region: process.env.AWS_REGION ?? "eu-central-1" }) : undefined;
 const converse = bedrock
@@ -24,7 +32,7 @@ const converse = bedrock
   : undefined;
 const extract = modelId && converse ? createBedrockExtractor({ client: converse, modelId, allowedRoot: captureRoot }) : undefined;
 
-const deps: HttpDeps = { store, allowedOrigins, ...(extract ? { extract } : {}) };
+const deps: HttpDeps = { store, allowedOrigins, adapterConfig, adapters, notify, ...(extract ? { extract } : {}) };
 const app = createHttpApp(deps);
 
 const worker = createScanWorker({
