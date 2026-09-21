@@ -28,6 +28,28 @@ function itemCard(item: Record<string, unknown>): string {
   return card(`${cls}${due ? ` · due ${due}` : ""}`, `<p>${text}</p>${actions}`, tone);
 }
 
+function threadCard(entry: Record<string, unknown>): string {
+  const thread = (entry.thread ?? {}) as Record<string, unknown>;
+  const urgency = String(thread.urgency ?? "low");
+  const tone = urgency === "high" ? "alert" : urgency === "medium" ? "info" : "";
+  const sender = thread.sender ? String(thread.sender) : "Unknown sender";
+  const demand = thread.demandType && thread.demandType !== "none" ? String(thread.demandType) : "document";
+  const reminders = Number(thread.reminderCount ?? 0);
+  const documents = Array.isArray(entry.documents) ? entry.documents.length : 0;
+  const parts = [`${urgency} urgency`];
+  if (entry.deadline) parts.push(`due ${String(entry.deadline)}`);
+  if (reminders > 0) parts.push(`${reminders} reminder(s)`);
+  parts.push(`${documents} document(s)`);
+  return card(`${sender} · ${demand}`, `<p class="meta">${escape(parts.join(" · "))}</p>`, tone);
+}
+
+function entryRow(entry: Record<string, unknown>): string {
+  const event = String(entry.event ?? "event");
+  const seq = entry.seq !== undefined ? `#${escape(entry.seq)} ` : "";
+  const meta = [String(entry.at ?? ""), String(entry.actor ?? "")].filter(Boolean).join(" · ");
+  return `<li class="timeline__item"><span class="timeline__event">${escape(event)}</span><span class="timeline__meta">${seq}${escape(meta)}</span></li>`;
+}
+
 export function renderConfirm(action: { actionId: string; type: string }): string {
   return `<section class="confirm" role="alertdialog" aria-label="Confirm action"><p>Carry out <strong>${escape(action.type)}</strong>?</p><div class="confirm__actions"><button type="button" class="confirm__yes" data-action-id="${escape(action.actionId)}">Yes</button><button type="button" class="confirm__no">Cancel</button></div></section>`;
 }
@@ -44,6 +66,27 @@ export function renderScreen(input: ScreenInput): string {
         : `<p class="empty">Nothing to show yet.</p>`;
     case "get_item":
       return result.item ? itemCard(result.item as Record<string, unknown>) : `<p class="empty">No item.</p>`;
+    case "get_backlog": {
+      const backlog = Array.isArray(result.backlog) ? (result.backlog as Array<Record<string, unknown>>) : [];
+      return backlog.length
+        ? `<section class="grid">${backlog.map(threadCard).join("")}</section>`
+        : `<p class="empty">Nothing is waiting on you right now.</p>`;
+    }
+    case "get_audit": {
+      const entries = Array.isArray(result.entries) ? (result.entries as Array<Record<string, unknown>>) : [];
+      return entries.length
+        ? `<ol class="timeline">${entries.map(entryRow).join("")}</ol>`
+        : `<p class="empty">I have no record of that.</p>`;
+    }
+    case "verify_ledger": {
+      if (typeof result.ok !== "boolean") return `<p class="empty">Nothing to verify yet.</p>`;
+      const entries = typeof result.entries === "number" ? result.entries : 0;
+      const terminal = typeof result.terminal === "string" ? result.terminal : "";
+      if (result.ok) {
+        return `<section class="badge badge--ok" role="status"><strong>Chain verified</strong><p class="badge__meta">${entries} entr${entries === 1 ? "y" : "ies"} — <code>${escape(terminal)}</code></p></section>`;
+      }
+      return `<section class="badge badge--bad" role="alert"><strong>Record does not verify</strong><p class="badge__meta">Entry ${escape(result.firstMismatchSeq ?? "?")} was changed.</p></section>`;
+    }
     case "daily_briefing": {
       const due = Array.isArray(result.due) ? result.due.length : 0;
       const flagged = Array.isArray(result.flagged) ? result.flagged.length : 0;
@@ -55,10 +98,27 @@ export function renderScreen(input: ScreenInput): string {
       if (result.available === false || !result.labelText) return `<p class="empty">I couldn't read that label.</p>`;
       return card(String(result.name ?? "Label"), `<pre class="label">${escape(result.labelText ?? "")}</pre><p class="disclaimer">${escape(result.disclaimer ?? "")}</p>`);
     case "act_on_item": {
+      if (result.failed === true) return `<p class="empty">I couldn't do that — please choose the action again.</p>`;
+      const decision = String(result.decision ?? "allow");
       const action = (result.action ?? {}) as Record<string, unknown>;
       const item = (result.item ?? {}) as Record<string, unknown>;
+      if (decision === "refuse" || decision === "escalate") {
+        const heading = decision === "escalate" ? "Needs help" : "Not allowed";
+        const reason = `<p>${escape(result.message ?? "")}</p>`;
+        if (decision === "escalate") {
+          return `<section class="card card--alert refusal" role="alert"><h2>${escape(heading)}</h2>${reason}</section>`;
+        }
+        const documentId = item.itemId !== undefined ? String(item.itemId) : "";
+        const attr = documentId ? ` data-document-id="${escape(documentId)}"` : "";
+        return `<section class="card card--alert refusal" role="alert"><h2>${escape(heading)}</h2>${reason}<div class="actions"><button type="button" class="escalate"${attr}>Ask my trusted contact to help</button></div></section>`;
+      }
       const status = action.status ? ` · ${action.status}` : "";
       return card(`${String(action.type ?? "Done")}${status}`, `<p>${escape(item.readAloudText ?? "")}</p>`, "info");
+    }
+    case "escalate_item": {
+      if (result.failed === true) return `<p class="empty">I couldn't reach your trusted contact.</p>`;
+      const alias = typeof result.alias === "string" && result.alias ? result.alias : "your trusted contact";
+      return card("Escalated", `<p>I've asked ${escape(alias)} to help with that.</p>`, "info");
     }
     case "find_object": {
       const found = result.found as Record<string, unknown> | null | undefined;
