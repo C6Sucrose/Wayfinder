@@ -40,6 +40,21 @@ export const copy = {
     lowConfidenceEscalate: "I can't read this reliably; I'll ask your trusted contact to help.",
     lowConfidenceConfirm: "I'm not certain I read this correctly — please confirm.",
   },
+  backlog: {
+    empty: "Nothing is waiting on you right now.",
+    summary: (count: number, top: string) => `${count} thing(s) need attention. Most urgent: ${top}.`
+  },
+  ledger: {
+    verified: (entries: number, terminal: string) => `The record has ${entries} entries and the chain is intact. Terminal hash ${terminal}. Nothing has been altered.`,
+    tampered: (seq: number) => `The record doesn't verify: entry ${seq} has been changed. I can't prove the record is unaltered.`
+  },
+  audit: {
+    empty: "I have no record of that."
+  },
+  escalated: (alias: string) => `I've asked ${alias} to help with that.`,
+  noTrustedContact: "I don't have a trusted contact set up.",
+  escalateTarget: "Tell me which document or thread to escalate.",
+  escalateUnknown: "I don't have a record of that document.",
   disclaimers: {
     label:
       "This is the text on the label, not medical advice. Consult a healthcare provider for personal decisions.",

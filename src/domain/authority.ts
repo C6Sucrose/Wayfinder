@@ -4,6 +4,15 @@ import type { ActionType, Authority, DocumentRecord } from "./model.js";
 export type ActionKind =
   | "make_payment" | "share_personal_data" | "delete_document" | "discard_document" | "other";
 
+export type AuthorityDecision = "allow" | "confirm" | "refuse" | "escalate";
+
+export const DEFAULT_AUTHORITY: Authority = {
+  autoActUpTo: { currency: "EUR", value: 0 },
+  confirmAbove: { currency: "EUR", value: 0 },
+  forbidden: [],
+  onLowConfidence: "ask"
+};
+
 export function kindFor(actionType: ActionType): ActionKind {
   switch (actionType) {
     case "share": return "share_personal_data";
@@ -17,7 +26,7 @@ export function evaluateAuthority(input: {
   amount?: { currency: string; value: number };
   record: DocumentRecord;
   authority: Authority;
-}): { decision: "allow" | "confirm" | "refuse"; reason: string } {
+}): { decision: AuthorityDecision; reason: string } {
   const { actionType, amount, record, authority } = input;
 
   const kind = kindFor(actionType);
@@ -30,7 +39,7 @@ export function evaluateAuthority(input: {
       return { decision: "refuse", reason: copy.authority.lowConfidenceRefuse };
     }
     if (authority.onLowConfidence === "escalate") {
-      return { decision: "refuse", reason: copy.authority.lowConfidenceEscalate };
+      return { decision: "escalate", reason: copy.authority.lowConfidenceEscalate };
     }
     return { decision: "confirm", reason: copy.authority.lowConfidenceConfirm };
   }

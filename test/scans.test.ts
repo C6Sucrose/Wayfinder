@@ -95,3 +95,30 @@ describe("processScan", () => {
     expect((await store.listItems("all")).filter((i) => i.scanId === scan.scanId)).toHaveLength(1);
   });
 });
+
+describe("processScan records and ledger", () => {
+  it("persists a document record and appends ingested then triaged", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    await processScan(store, scan.scanId, ["Hello, please look at this letter."]);
+    const item = (await store.listItems("all")).find((i) => i.scanId === scan.scanId)!;
+    expect(item.record?.lifecycle).toBe("open");
+    expect(item.record?.threadKey).toMatch(/^t_/);
+    expect((await store.listLedger()).map((e) => e.event)).toEqual(["ingested", "triaged"]);
+  });
+
+  it("marks a low-confidence read as awaiting recapture", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    await processScan(store, scan.scanId, ["Hello, account DE89370400440532013001."]);
+    const item = (await store.listItems("all")).find((i) => i.scanId === scan.scanId)!;
+    expect(item.record?.confidence).toBe("low");
+    expect(item.record?.needsRecapture).toBe(true);
+    expect(item.record?.lifecycle).toBe("awaiting_action");
+  });
+
+  it("still marks the scan ready when the ledger cannot be written", async () => {
+    const scan = await createScan(store, { imageRefs: ["a"], hint: "mail" });
+    const flaky = { ...store, putLedgerEntry: async () => { throw new Error("ledger down"); } } as typeof store;
+    const done = await processScan(flaky, scan.scanId, ["Hello there."]);
+    expect(done.status).toBe("ready");
+  });
+});
