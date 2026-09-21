@@ -196,6 +196,18 @@ describe("icsFileSink", () => {
     expect(result.ref.startsWith(dir)).toBe(true);
     expect(readFileSync(result.ref, "utf8")).toContain("SUMMARY:Dentist");
   });
+
+  it("redacts the title and description before writing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wf-ics-redact-"));
+    const sink = createIcsFileSink({ dir, now: () => "2026-09-20T12:00:00.000Z" });
+    const result = await sink.publish({
+      title: "Transfer DE89370400440532013000",
+      start: "2026-10-01T09:00:00.000Z",
+      description: "Pay to DE89370400440532013000"
+    });
+    const written = readFileSync(result.ref, "utf8");
+    expect(written).not.toContain("DE89370400440532013000");
+  });
 });
 
 describe("webhookNotifier", () => {
@@ -211,11 +223,19 @@ describe("webhookNotifier", () => {
       return { ok: true, status: 200 } as Response;
     }) as unknown as typeof fetch;
     const notifier = createWebhookNotifier({ url: "https://hooks.example/wf", allowlist: ["https://hooks.example/wf"], fetchImpl });
-    const result = await notifier.notify({ entryId: "led_1", event: "action_executed", summary: "Account DE89370400440532013000 noted" });
+    const result = await notifier.notify({
+      entryId: "led_1",
+      event: "action_executed",
+      documentId: "acct-1234567",
+      threadKey: "tax 7654321",
+      summary: "Account DE89370400440532013000 noted"
+    });
     expect(result).toEqual({ delivered: true, detail: "delivered" });
     expect(calls).toHaveLength(1);
     expect(calls[0]!.body).toContain("led_1");
     expect(calls[0]!.body).not.toContain("DE89370400440532013000");
+    expect(calls[0]!.body).not.toContain("1234567");
+    expect(calls[0]!.body).not.toContain("7654321");
   });
 
   it("suppresses a duplicate entryId so a retry cannot double-notify", async () => {

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { redactSensitive } from "../domain/redact.js";
 import type { CalendarSink } from "./types.js";
 
 function pad(value: number): string {
@@ -51,10 +52,10 @@ export function createIcsFileSink(deps: { dir: string; now?: () => string }): Ca
       const ics = buildIcs({
         uid,
         stamp,
-        title: input.title,
+        title: redactSensitive(input.title),
         start: input.start,
         ...(input.durationMinutes !== undefined ? { durationMinutes: input.durationMinutes } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {})
+        ...(input.description !== undefined ? { description: redactSensitive(input.description) } : {})
       });
       const file = join(deps.dir, `${uid}.ics`);
       await writeFile(file, ics, "utf8");
