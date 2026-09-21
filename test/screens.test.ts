@@ -197,6 +197,36 @@ describe("renderScreen: get_audit", () => {
   });
 });
 
+describe("renderScreen: verify_ledger", () => {
+  it("renders a verified badge with the entry count and terminal hash", () => {
+    const html = renderScreen({
+      toolName: "verify_ledger",
+      arguments: {},
+      result: { ok: true, entries: 2, terminal: "abc123" }
+    });
+    expect(html).toContain("badge--ok");
+    expect(html).toContain("Chain verified");
+    expect(html).toContain("2 entries");
+    expect(html).toContain("abc123");
+  });
+
+  it("renders a tampered badge with the first mismatching sequence", () => {
+    const html = renderScreen({
+      toolName: "verify_ledger",
+      arguments: {},
+      result: { ok: false, entries: 2, firstMismatchSeq: 2 }
+    });
+    expect(html).toContain("badge--bad");
+    expect(html).toContain("Entry 2 was changed");
+  });
+
+  it("renders an empty state when there is no result", () => {
+    expect(renderScreen({ toolName: "verify_ledger", arguments: {}, result: {} })).toBe(
+      '<p class="empty">Nothing to verify yet.</p>'
+    );
+  });
+});
+
 describe("renderScreen: identify_product", () => {
   it("renders an escaped name, label, and disclaimer", () => {
     const html = renderScreen({
