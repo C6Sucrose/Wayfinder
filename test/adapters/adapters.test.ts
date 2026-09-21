@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { nullAdapters } from "../../src/adapters/null.js";
 import { resolveAdapterConfig } from "../../src/adapters/config.js";
+import { buildEpcPayload, crc16ccitt, epcPayment } from "../../src/adapters/epcQr.js";
 
 describe("null adapters", () => {
   it("delivers nothing and says so without throwing", async () => {
@@ -105,5 +106,62 @@ describe("resolveAdapterConfig", () => {
       WAYFINDER_ADAPTER_TIMEOUT_MS: "2500"
     });
     expect(good.notifier).toEqual({ kind: "webhook", url: "https://hooks.example/wf", allowlist: ["https://hooks.example/wf"], timeoutMs: 2500 });
+  });
+});
+
+function independentCrc16(input: string): string {
+  let crc = 0xffff;
+  for (const byte of Buffer.from(input, "utf8")) {
+    crc ^= byte << 8;
+    for (let i = 0; i < 8; i += 1) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+
+describe("epcQr", () => {
+  it("builds an EPC069-12 payload whose trailing checksum round-trips", () => {
+    const payload = buildEpcPayload({
+      beneficiaryName: "City Water",
+      iban: "DE89370400440532013000",
+      amount: { currency: "EUR", value: 12.5 },
+      remittance: "INV-1"
+    });
+    const data = payload.slice(0, -4);
+    const checksum = payload.slice(-4);
+    expect(checksum).toBe(independentCrc16(data));
+    expect(data.startsWith("BCD\n002\n1\nSCT\n")).toBe(true);
+    expect(data).toContain("City Water");
+    expect(data).toContain("DE89370400440532013000");
+    expect(data).toContain("EUR12.50");
+    expect(data.endsWith("\n")).toBe(true);
+  });
+
+  it("refuses an invalid IBAN", () => {
+    expect(() => buildEpcPayload({
+      beneficiaryName: "City Water",
+      iban: "DE89370400440532013001",
+      amount: { currency: "EUR", value: 12.5 },
+      remittance: "INV-1"
+    })).toThrow(/invalid IBAN/i);
+  });
+
+  it("epcPayment prepares a payload and refuses an invalid IBAN", () => {
+    const result = epcPayment.prepare({
+      amount: { currency: "EUR", value: 12.5 },
+      beneficiaryName: "City Water",
+      iban: "DE89370400440532013000",
+      remittance: "INV-1"
+    });
+    expect(result.epcQr).toBeDefined();
+    expect(() => epcPayment.prepare({
+      amount: { currency: "EUR", value: 12.5 },
+      beneficiaryName: "City Water",
+      iban: "DE89370400440532013001",
+      remittance: "INV-1"
+    })).toThrow(/invalid IBAN/i);
+  });
+
+  it("crc16ccitt matches a known vector", () => {
+    expect(crc16ccitt("123456789")).toBe("29B1");
   });
 });
