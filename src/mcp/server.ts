@@ -160,10 +160,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "act_on_item",
-    "Carry out one of the suggested actions for an item after the customer confirms it.",
-    { itemId: z.string(), actionId: z.string(), confirmed: z.boolean().default(false) },
+    {
+      description: "Carry out one of the suggested actions for an item after the customer confirms it.",
+      inputSchema: { itemId: z.string(), actionId: z.string(), confirmed: z.boolean().default(false) },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ itemId, actionId, confirmed }) => {
       try {
         const result = await applyAction(deps.store, itemId, actionId, { confirmed });
@@ -195,7 +199,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         }
         return {
           content: [{ type: "text", text: result.message }],
-          structuredContent: { action: result.action, item: result.item, decision: result.decision }
+          structuredContent: { action: result.action, item: result.item, decision: result.decision, message: result.message }
         };
       } catch (err) {
         return safeError("act_on_item", err, copy.toolFailed);
@@ -377,7 +381,7 @@ export function buildServer(deps: ServerDeps): McpServer {
         deps.notify?.enqueue({ event: "escalated", summary: escalated, entryId: receipt.entryId });
         return {
           content: [{ type: "text", text: escalated }],
-          structuredContent: { escalated: true }
+          structuredContent: { escalated: true, alias: preferences.trustedContactAlias }
         };
       } catch (err) {
         return safeError("escalate_item", err);

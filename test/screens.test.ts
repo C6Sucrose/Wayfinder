@@ -288,6 +288,70 @@ describe("renderScreen: act_on_item", () => {
   });
 });
 
+describe("renderScreen: refusal card", () => {
+  it("shows the refusal reason and an escalate affordance", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: {
+        decision: "refuse",
+        message: "You have not allowed me to discard document.",
+        action: { type: "discard", status: "proposed" },
+        item: { itemId: "itm_ref", readAloudText: "Old bill" }
+      }
+    });
+    expect(html).toContain("card--alert");
+    expect(html).toContain("You have not allowed me to discard document.");
+    expect(html).toContain('class="escalate"');
+    expect(html).toContain('data-document-id="itm_ref"');
+    expect(html).not.toContain("card--info");
+  });
+
+  it("escapes hostile refusal text and item ids", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: { decision: "refuse", message: "<b>no</b>", item: { itemId: '"><img src=x>' } }
+    });
+    expect(html).toContain("&lt;b&gt;no&lt;/b&gt;");
+    expect(html).toContain('data-document-id="&quot;&gt;&lt;img src=x&gt;"');
+    expect(html).not.toContain("<img");
+  });
+
+  it("still renders an executed action as an info card", () => {
+    const html = renderScreen({
+      toolName: "act_on_item",
+      arguments: {},
+      result: { decision: "allow", action: { type: "Pay", status: "done" }, item: { readAloudText: "Paid" } }
+    });
+    expect(html).toContain("Pay · done");
+    expect(html).toContain("card--info");
+  });
+});
+
+describe("renderScreen: escalation result", () => {
+  it("confirms the escalation with the contact alias", () => {
+    const html = renderScreen({
+      toolName: "escalate_item",
+      arguments: {},
+      result: { escalated: true, alias: "Priya" }
+    });
+    expect(html).toContain("Escalated");
+    expect(html).toContain("I've asked Priya to help with that.");
+  });
+
+  it("falls back when the alias is missing", () => {
+    const html = renderScreen({ toolName: "escalate_item", arguments: {}, result: { escalated: true } });
+    expect(html).toContain("your trusted contact");
+  });
+
+  it("reports a failure when the escalation failed", () => {
+    expect(renderScreen({ toolName: "escalate_item", arguments: {}, result: { failed: true } })).toBe(
+      '<p class="empty">I couldn\'t reach your trusted contact.</p>'
+    );
+  });
+});
+
 describe("renderConfirm", () => {
   it("renders exact Yes and Cancel buttons with the action id", () => {
     const html = renderConfirm({ actionId: "report", type: "Report" });
