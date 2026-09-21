@@ -18,6 +18,7 @@ import { buildRecordReport, verifyLedger } from "../domain/ledger.js";
 import type { Item } from "../domain/model.js";
 import { buildCapabilities, readChain } from "../adapters/capabilities.js";
 import type { AdapterBundle } from "../adapters/types.js";
+import { nullAdapters } from "../adapters/null.js";
 import type { AdapterConfig } from "../adapters/config.js";
 import type { NotifyQueue } from "../adapters/notifyQueue.js";
 
@@ -163,6 +164,15 @@ export function buildServer(deps: ServerDeps): McpServer {
     async ({ itemId, actionId, confirmed }) => {
       try {
         const result = await applyAction(deps.store, itemId, actionId, { confirmed });
+        if (result.receipt !== undefined) {
+          deps.notify?.enqueue({
+            event: result.receipt.event,
+            summary: result.message,
+            entryId: result.receipt.entryId,
+            documentId: itemId,
+            ...(result.receipt.threadKey !== undefined ? { threadKey: result.receipt.threadKey } : {})
+          });
+        }
         return {
           content: [{ type: "text", text: result.message }],
           structuredContent: { action: result.action, item: result.item, decision: result.decision }
@@ -323,7 +333,7 @@ export function buildServer(deps: ServerDeps): McpServer {
           }
           await deps.store.putItem(withLifecycle(item, "escalated", at));
         }
-        await createLedger(deps.store).append({
+        const receipt = await createLedger(deps.store).append({
           at,
           actor: "user",
           event: "escalated",
@@ -331,13 +341,59 @@ export function buildServer(deps: ServerDeps): McpServer {
           ...(threadKey !== undefined ? { threadKey } : {}),
           ...(reason !== undefined ? { details: { reason } } : {})
         });
+        const escalated = copy.escalated(preferences.trustedContactAlias);
+        deps.notify?.enqueue({ event: "escalated", summary: escalated, entryId: receipt.entryId });
         return {
-          content: [{ type: "text", text: copy.escalated(preferences.trustedContactAlias) }],
+          content: [{ type: "text", text: escalated }],
           structuredContent: { escalated: true }
         };
       } catch (err) {
         return safeError("escalate_item", err);
       }
+    }
+  );
+
+  server.tool(
+    "prepare_payment",
+    "Prepare a payment the customer completes in their own banking app. Never moves money.",
+    {
+      beneficiaryName: z.string(),
+      iban: z.string(),
+      amount: z.object({ currency: z.string(), value: z.number().nonnegative() }),
+      remittance: z.string(),
+      documentId: z.string().optional()
+    },
+    async ({ beneficiaryName, iban, amount, remittance, documentId }) => {
+      const adapters = deps.adapters ?? nullAdapters;
+      let prepared: { instruction: string; epcQr?: string; ledgerNote: string };
+      try {
+        prepared = adapters.payment.prepare({ beneficiaryName, iban, amount, remittance });
+      } catch {
+        return { content: [{ type: "text", text: copy.payment.invalidIban }], isError: true as const };
+      }
+      try {
+        const at = new Date().toISOString();
+        const ledger = createLedger(deps.store);
+        const receipt = await ledger.append({
+          at,
+          actor: "agent",
+          event: "action_proposed",
+          details: { actionType: "payment_handoff" },
+          ...(documentId !== undefined ? { documentId } : {})
+        });
+        deps.notify?.enqueue({
+          event: "action_proposed",
+          summary: prepared.ledgerNote,
+          entryId: receipt.entryId,
+          ...(documentId !== undefined ? { documentId } : {})
+        });
+      } catch (err) {
+        return safeError("prepare_payment", err);
+      }
+      return {
+        content: [{ type: "text", text: copy.payment.prepared }],
+        structuredContent: { instruction: prepared.instruction, ...(prepared.epcQr !== undefined ? { epcQr: prepared.epcQr } : {}) }
+      };
     }
   );
 

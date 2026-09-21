@@ -9,10 +9,11 @@ import { buildServer } from "../src/mcp/server.js";
 import { createHttpApp } from "../src/server/http.js";
 import { createAdapters } from "../src/adapters/registry.js";
 import { resolveAdapterConfig } from "../src/adapters/config.js";
+import { createNotifyQueue } from "../src/adapters/notifyQueue.js";
 
-async function connect() {
+async function connect(env: NodeJS.ProcessEnv = {}) {
   const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-")));
-  const adapterConfig = resolveAdapterConfig({});
+  const adapterConfig = resolveAdapterConfig(env);
   const server = buildServer({ store, adapterConfig, adapters: createAdapters(adapterConfig) });
   const client = new Client({ name: "t", version: "0.0.1" });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -48,5 +49,66 @@ describe("capability disclosure", () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe("prepare_payment", () => {
+  it("prepares an EPC payload and records the handoff, never a payment", async () => {
+    const { client, store } = await connect({ WAYFINDER_ADAPTER_PAYMENT: "epc" });
+    const res = await client.callTool({
+      name: "prepare_payment",
+      arguments: {
+        beneficiaryName: "City Water",
+        iban: "DE89370400440532013000",
+        amount: { currency: "EUR", value: 12.5 },
+        remittance: "INV-1",
+        documentId: "itm_a"
+      }
+    });
+    const sc = res.structuredContent as { epcQr?: string };
+    expect(typeof sc.epcQr).toBe("string");
+    const events = (await store.listLedger()).map((e) => e.event);
+    expect(events).toContain("action_proposed");
+    expect(JSON.stringify(await store.listLedger())).not.toContain("DE89370400440532013000");
+    await client.close();
+  });
+
+  it("refuses an invalid IBAN", async () => {
+    const { client } = await connect({ WAYFINDER_ADAPTER_PAYMENT: "epc" });
+    const res = await client.callTool({
+      name: "prepare_payment",
+      arguments: {
+        beneficiaryName: "City Water",
+        iban: "DE89370400440532013001",
+        amount: { currency: "EUR", value: 12.5 },
+        remittance: "INV-1"
+      }
+    });
+    expect(res.isError).toBe(true);
+    await client.close();
+  });
+
+  it("enqueues a notification after an allowed action", async () => {
+    const store = createFileStore(mkdtempSync(join(tmpdir(), "wf-")));
+    const seen: string[] = [];
+    const notify = createNotifyQueue({
+      notifier: { async notify(input) { seen.push(input.event); return { delivered: true, detail: "ok" }; } },
+      store
+    });
+    const adapterConfig = resolveAdapterConfig({});
+    const server = buildServer({ store, adapterConfig, adapters: createAdapters(adapterConfig), notify });
+    const client = new Client({ name: "t", version: "0.0.1" });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(a), client.connect(b)]);
+    await store.putItem({
+      itemId: "itm_n", scanId: "scn_n", class: "bill", confidence: 0.8, readAloudText: "bill",
+      fields: { dueDate: "2026-10-01" },
+      proposedActions: [{ actionId: "itm_n:remind", itemId: "itm_n", type: "remind", params: { on: "2026-10-01" }, status: "proposed" }],
+      createdAt: "2026-09-19T10:00:00.000Z", resolvedAt: null
+    });
+    await client.callTool({ name: "act_on_item", arguments: { itemId: "itm_n", actionId: "itm_n:remind" } });
+    await notify.drain();
+    expect(seen).toContain("action_executed");
+    await client.close();
   });
 });
