@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ItemSchema, ActionSchema, LedgerEntrySchema, DocumentStateSchema, PreferencesSchema } from "../src/domain/model.js";
+import { ItemSchema, ActionSchema, LedgerEntrySchema, LedgerEventSchema, DocumentStateSchema, PreferencesSchema } from "../src/domain/model.js";
 
 describe("domain model", () => {
   it("accepts a valid item", () => {
@@ -94,5 +94,12 @@ describe("v2 model extensions", () => {
         }
       })
     ).toThrow();
+  });
+});
+
+describe("v2 ledger events", () => {
+  it("accepts the executed and external-invoked events", () => {
+    expect(LedgerEventSchema.parse("action_executed")).toBe("action_executed");
+    expect(LedgerEventSchema.parse("external_invoked")).toBe("external_invoked");
   });
 });

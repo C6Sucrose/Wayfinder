@@ -110,8 +110,8 @@ export const PreferencesSchema = z.object({
 export type Preferences = z.infer<typeof PreferencesSchema>;
 
 export const LedgerEventSchema = z.enum([
-  "ingested", "triaged", "action_proposed", "action_confirmed", "action_refused",
-  "delivery_failed", "superseded", "flag_raised", "escalated", "closed"
+  "ingested", "triaged", "action_proposed", "action_executed", "action_confirmed", "action_refused",
+  "delivery_failed", "external_invoked", "superseded", "flag_raised", "escalated", "closed"
 ]);
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>;
 
