@@ -303,10 +303,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "verify_ledger",
-    "Prove the record has not been altered since it was written.",
-    {},
+    {
+      description: "Prove the record has not been altered since it was written.",
+      inputSchema: {},
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async () => {
       try {
         const entries = await createLedger(deps.store).read();

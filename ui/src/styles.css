@@ -30,3 +30,8 @@ button, .actions button { min-height: 48px; }
 .timeline { list-style: none; margin: 0; padding: 0; }
 .timeline__item { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--wf-fg) 12%, transparent); }
 .timeline__meta { color: var(--wf-muted); font-size: 0.9rem; }
+.badge { border-radius: var(--wf-radius); padding: 16px; }
+.badge--ok { background: #e7f6ec; color: #14532d; }
+.badge--bad { background: var(--wf-alert-bg); color: var(--wf-alert-fg); }
+.badge__meta { margin: 8px 0 0; }
+.badge code { overflow-wrap: anywhere; }

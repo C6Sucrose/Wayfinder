@@ -78,6 +78,15 @@ export function renderScreen(input: ScreenInput): string {
         ? `<ol class="timeline">${entries.map(entryRow).join("")}</ol>`
         : `<p class="empty">I have no record of that.</p>`;
     }
+    case "verify_ledger": {
+      if (typeof result.ok !== "boolean") return `<p class="empty">Nothing to verify yet.</p>`;
+      const entries = typeof result.entries === "number" ? result.entries : 0;
+      const terminal = typeof result.terminal === "string" ? result.terminal : "";
+      if (result.ok) {
+        return `<section class="badge badge--ok" role="status"><strong>Chain verified</strong><p class="badge__meta">${entries} entr${entries === 1 ? "y" : "ies"} — <code>${escape(terminal)}</code></p></section>`;
+      }
+      return `<section class="badge badge--bad" role="alert"><strong>Record does not verify</strong><p class="badge__meta">Entry ${escape(result.firstMismatchSeq ?? "?")} was changed.</p></section>`;
+    }
     case "daily_briefing": {
       const due = Array.isArray(result.due) ? result.due.length : 0;
       const flagged = Array.isArray(result.flagged) ? result.flagged.length : 0;
