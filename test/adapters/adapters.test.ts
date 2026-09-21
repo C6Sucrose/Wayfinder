@@ -256,4 +256,36 @@ describe("createAdapters", () => {
     });
     expect(result.epcQr).toBeDefined();
   });
+
+  it("wires the webhook notifier and forwards an injected fetch", async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string | URL) => {
+      calls.push(String(url));
+      return { ok: true, status: 200 } as Response;
+    }) as unknown as typeof fetch;
+    const bundle = createAdapters(
+      resolveAdapterConfig({
+        WAYFINDER_ADAPTER_NOTIFIER: "webhook",
+        WAYFINDER_WEBHOOK_URL: "https://hooks.example/wf",
+        WAYFINDER_WEBHOOK_ALLOWLIST: "https://hooks.example/wf"
+      }),
+      { fetchImpl }
+    );
+    const result = await bundle.notifier.notify({ event: "triaged", summary: "x" });
+    expect(result).toEqual({ delivered: true, detail: "delivered" });
+    expect(calls).toEqual(["https://hooks.example/wf"]);
+  });
+
+  it("wires the ICS calendar sink when configured", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wf-registry-ics-"));
+    const bundle = createAdapters(resolveAdapterConfig({ WAYFINDER_ADAPTER_CALENDAR: "ics", WAYFINDER_ICS_DIR: dir }));
+    const result = await bundle.calendar.publish({ title: "Dentist", start: "2026-10-01T09:00:00.000Z" });
+    expect(result.ref.startsWith(dir)).toBe(true);
+  });
+
+  it("keeps the null notifier and calendar when nothing is configured", () => {
+    const bundle = createAdapters(resolveAdapterConfig({}));
+    expect(bundle.notifier).toBe(nullAdapters.notifier);
+    expect(bundle.calendar).toBe(nullAdapters.calendar);
+  });
 });
