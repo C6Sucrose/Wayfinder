@@ -43,6 +43,13 @@ function threadCard(entry: Record<string, unknown>): string {
   return card(`${sender} · ${demand}`, `<p class="meta">${escape(parts.join(" · "))}</p>`, tone);
 }
 
+function entryRow(entry: Record<string, unknown>): string {
+  const event = String(entry.event ?? "event");
+  const seq = entry.seq !== undefined ? `#${escape(entry.seq)} ` : "";
+  const meta = [String(entry.at ?? ""), String(entry.actor ?? "")].filter(Boolean).join(" · ");
+  return `<li class="timeline__item"><span class="timeline__event">${escape(event)}</span><span class="timeline__meta">${seq}${escape(meta)}</span></li>`;
+}
+
 export function renderConfirm(action: { actionId: string; type: string }): string {
   return `<section class="confirm" role="alertdialog" aria-label="Confirm action"><p>Carry out <strong>${escape(action.type)}</strong>?</p><div class="confirm__actions"><button type="button" class="confirm__yes" data-action-id="${escape(action.actionId)}">Yes</button><button type="button" class="confirm__no">Cancel</button></div></section>`;
 }
@@ -64,6 +71,12 @@ export function renderScreen(input: ScreenInput): string {
       return backlog.length
         ? `<section class="grid">${backlog.map(threadCard).join("")}</section>`
         : `<p class="empty">Nothing is waiting on you right now.</p>`;
+    }
+    case "get_audit": {
+      const entries = Array.isArray(result.entries) ? (result.entries as Array<Record<string, unknown>>) : [];
+      return entries.length
+        ? `<ol class="timeline">${entries.map(entryRow).join("")}</ol>`
+        : `<p class="empty">I have no record of that.</p>`;
     }
     case "daily_briefing": {
       const due = Array.isArray(result.due) ? result.due.length : 0;

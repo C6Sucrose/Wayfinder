@@ -27,3 +27,6 @@ button, .actions button { min-height: 48px; }
 .confirm button { min-height: 48px; }
 .confirm button:focus-visible { outline: 2px solid var(--wf-accent); outline-offset: 2px; }
 .meta { color: var(--wf-muted); margin: 0; }
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline__item { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--wf-fg) 12%, transparent); }
+.timeline__meta { color: var(--wf-muted); font-size: 0.9rem; }

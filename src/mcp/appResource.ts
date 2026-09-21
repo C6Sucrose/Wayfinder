@@ -2,7 +2,8 @@ import { readFileSync, existsSync } from "node:fs";
 
 export const APP_RESOURCE_URI = "ui://wayfinder/app.html";
 export const UI_TOOLS = [
-  "get_scan", "list_items", "get_item", "daily_briefing", "identify_product", "find_object", "get_backlog"
+  "get_scan", "list_items", "get_item", "daily_briefing", "identify_product", "find_object",
+  "get_backlog", "get_audit"
 ] as const;
 
 export function readAppHtml(): string {

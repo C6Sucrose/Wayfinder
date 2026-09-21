@@ -277,10 +277,14 @@ export function buildServer(deps: ServerDeps): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "get_audit",
-    "Explain what happened to a document or thread, from the record.",
-    { documentId: z.string().optional(), threadKey: z.string().optional() },
+    {
+      description: "Explain what happened to a document or thread, from the record.",
+      inputSchema: { documentId: z.string().optional(), threadKey: z.string().optional() },
+      _meta: { ui: { resourceUri: APP_RESOURCE_URI } }
+    },
     async ({ documentId, threadKey }) => {
       if (documentId === undefined && threadKey === undefined) {
         return { content: [{ type: "text", text: copy.audit.empty }], structuredContent: { entries: [] } };

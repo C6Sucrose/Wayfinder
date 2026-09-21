@@ -165,6 +165,38 @@ describe("renderScreen: get_backlog", () => {
   });
 });
 
+describe("renderScreen: get_audit", () => {
+  const entries = [
+    { seq: 1, at: "2026-09-20T12:00:00.000Z", actor: "agent", event: "ingested" },
+    { seq: 2, at: "2026-09-20T12:01:00.000Z", actor: "user", event: "action_confirmed" }
+  ];
+
+  it("renders an event timeline with sequence, time, and actor", () => {
+    const html = renderScreen({ toolName: "get_audit", arguments: {}, result: { entries } });
+    expect(html).toContain('<ol class="timeline">');
+    expect(html).toContain("ingested");
+    expect(html).toContain("action_confirmed");
+    expect(html).toContain("#1");
+    expect(html).toContain("user");
+  });
+
+  it("escapes hostile event text", () => {
+    const html = renderScreen({
+      toolName: "get_audit",
+      arguments: {},
+      result: { entries: [{ seq: 1, event: "<script>alert(1)</script>" }] }
+    });
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).not.toContain("<script>");
+  });
+
+  it("renders an empty state with no history", () => {
+    expect(renderScreen({ toolName: "get_audit", arguments: {}, result: { entries: [] } })).toBe(
+      '<p class="empty">I have no record of that.</p>'
+    );
+  });
+});
+
 describe("renderScreen: identify_product", () => {
   it("renders an escaped name, label, and disclaimer", () => {
     const html = renderScreen({
