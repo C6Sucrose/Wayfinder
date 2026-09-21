@@ -8,13 +8,27 @@ import type {
   SignatureProvider
 } from "../../src/adapters/types.js";
 
-export function runNotifierContract(label: string, make: () => Notifier): void {
+export function runNotifierContract(
+  label: string,
+  make: () => Notifier,
+  options?: { expectsDelivery?: boolean; lastBody?: () => string }
+): void {
   describe(`Notifier contract (${label})`, () => {
-    it("never throws and returns a boolean delivered flag with a string detail", async () => {
-      const result = await make().notify({ event: "triaged", summary: "contract summary" });
-      expect(typeof result.delivered).toBe("boolean");
-      expect(typeof result.detail).toBe("string");
+    it("never throws, reports the expected delivery flag, and returns a non-empty detail", async () => {
+      const result = await make().notify({
+        event: "triaged",
+        summary: "Account DE89370400440532013000 noted"
+      });
+      expect(result.delivered).toBe(options?.expectsDelivery ?? false);
+      expect(result.detail.length).toBeGreaterThan(0);
     });
+
+    if (options?.lastBody !== undefined) {
+      const readBody = options.lastBody;
+      it("redacts the raw IBAN before it leaves the adapter", () => {
+        expect(readBody()).not.toContain("DE89370400440532013000");
+      });
+    }
   });
 }
 
