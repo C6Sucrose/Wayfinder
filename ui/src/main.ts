@@ -11,6 +11,7 @@ function paint(): void {
   root.innerHTML = renderScreen(current) + (pendingAction ? renderConfirm(pendingAction) : "");
   wireActions();
   wireConfirm();
+  wireEscalate();
   // Report height so the host can size the iframe.
   void app.sendSizeChanged({ height: document.documentElement.scrollHeight });
 }
@@ -43,13 +44,35 @@ async function confirmAction(button: HTMLButtonElement): Promise<void> {
   try {
     const res = await app.callServerTool({
       name: "act_on_item",
-      arguments: { itemId: pending.itemId, actionId: pending.actionId }
+      arguments: { itemId: pending.itemId, actionId: pending.actionId, confirmed: true }
     });
     pendingAction = undefined;
     current = { ...current, toolName: "act_on_item", result: res.structuredContent };
   } catch (err) {
     console.error("[view] action failed:", err);
     pendingAction = undefined;
+  } finally {
+    button.disabled = false;
+  }
+  paint();
+}
+
+function wireEscalate(): void {
+  root.querySelectorAll<HTMLButtonElement>("button.escalate").forEach((button) => {
+    button.addEventListener("click", () => void escalateItem(button));
+  });
+}
+
+async function escalateItem(button: HTMLButtonElement): Promise<void> {
+  const documentId = button.dataset.documentId;
+  if (!documentId) return;
+  button.disabled = true;
+  try {
+    const res = await app.callServerTool({ name: "escalate_item", arguments: { documentId } });
+    current = { ...current, toolName: "escalate_item", result: res.isError ? { failed: true } : res.structuredContent };
+  } catch (err) {
+    console.error("[view] escalation failed:", err);
+    current = { ...current, toolName: "escalate_item", result: { failed: true } };
   } finally {
     button.disabled = false;
   }

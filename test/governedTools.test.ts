@@ -168,3 +168,39 @@ describe("escalate_item", () => {
     await client.close();
   });
 });
+
+describe("act_on_item refusal payload", () => {
+  it("returns the decision and reason for the refusal card", async () => {
+    const { client, store } = await connect();
+    await store.putItem(item({
+      itemId: "itm_ref",
+      proposedActions: [{ actionId: "a1", itemId: "itm_ref", type: "discard", status: "proposed", params: {} }]
+    }));
+    await store.putPreferences({
+      ...(await store.getPreferences()),
+      authority: {
+        autoActUpTo: { currency: "EUR", value: 0 },
+        confirmAbove: { currency: "EUR", value: 0 },
+        forbidden: ["discard_document"],
+        onLowConfidence: "ask"
+      }
+    });
+    const res = await client.callTool({ name: "act_on_item", arguments: { itemId: "itm_ref", actionId: "a1" } });
+    const sc = res.structuredContent as { decision: string; message: string };
+    expect(sc.decision).toBe("refuse");
+    expect(sc.message).toBe(copy.authority.forbidden("discard_document"));
+    await client.close();
+  });
+});
+
+describe("escalate_item alias payload", () => {
+  it("returns the trusted contact alias", async () => {
+    const { client, store } = await connect();
+    await store.putItem(item({ itemId: "itm_esc" }));
+    await store.putPreferences({ ...(await store.getPreferences()), trustedContactAlias: "Priya" });
+    const res = await client.callTool({ name: "escalate_item", arguments: { documentId: "itm_esc" } });
+    const sc = res.structuredContent as { escalated: boolean; alias: string };
+    expect(sc).toEqual({ escalated: true, alias: "Priya" });
+    await client.close();
+  });
+});

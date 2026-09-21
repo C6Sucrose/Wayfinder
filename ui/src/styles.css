@@ -35,3 +35,4 @@ button, .actions button { min-height: 48px; }
 .badge--bad { background: var(--wf-alert-bg); color: var(--wf-alert-fg); }
 .badge__meta { margin: 8px 0 0; }
 .badge code { overflow-wrap: anywhere; }
+.refusal h2 { text-transform: none; }

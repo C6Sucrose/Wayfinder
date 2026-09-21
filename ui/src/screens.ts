@@ -98,10 +98,22 @@ export function renderScreen(input: ScreenInput): string {
       if (result.available === false || !result.labelText) return `<p class="empty">I couldn't read that label.</p>`;
       return card(String(result.name ?? "Label"), `<pre class="label">${escape(result.labelText ?? "")}</pre><p class="disclaimer">${escape(result.disclaimer ?? "")}</p>`);
     case "act_on_item": {
+      const decision = String(result.decision ?? "allow");
       const action = (result.action ?? {}) as Record<string, unknown>;
       const item = (result.item ?? {}) as Record<string, unknown>;
+      if (decision === "refuse" || decision === "escalate") {
+        const documentId = item.itemId !== undefined ? String(item.itemId) : "";
+        const attr = documentId ? ` data-document-id="${escape(documentId)}"` : "";
+        const heading = decision === "escalate" ? "Needs help" : "Not allowed";
+        return `<section class="card card--alert refusal" role="alert"><h2>${escape(heading)}</h2><p>${escape(result.message ?? "")}</p><div class="actions"><button type="button" class="escalate"${attr}>Ask my trusted contact to help</button></div></section>`;
+      }
       const status = action.status ? ` · ${action.status}` : "";
       return card(`${String(action.type ?? "Done")}${status}`, `<p>${escape(item.readAloudText ?? "")}</p>`, "info");
+    }
+    case "escalate_item": {
+      if (result.failed === true) return `<p class="empty">I couldn't reach your trusted contact.</p>`;
+      const alias = typeof result.alias === "string" && result.alias ? result.alias : "your trusted contact";
+      return card("Escalated", `<p>I've asked ${escape(alias)} to help with that.</p>`, "info");
     }
     case "find_object": {
       const found = result.found as Record<string, unknown> | null | undefined;
