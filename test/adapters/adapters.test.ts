@@ -87,4 +87,23 @@ describe("resolveAdapterConfig", () => {
     expect(config.calendar).toEqual({ kind: "null" });
     expect(config.warnings.join(" ")).toMatch(/WAYFINDER_ICS_DIR/);
   });
+
+  it("falls back to the default timeout and warns when the configured timeout is invalid", () => {
+    const bad = resolveAdapterConfig({
+      WAYFINDER_ADAPTER_NOTIFIER: "webhook",
+      WAYFINDER_WEBHOOK_URL: "https://hooks.example/wf",
+      WAYFINDER_WEBHOOK_ALLOWLIST: "https://hooks.example/wf",
+      WAYFINDER_ADAPTER_TIMEOUT_MS: "abc"
+    });
+    expect(bad.notifier).toEqual({ kind: "webhook", url: "https://hooks.example/wf", allowlist: ["https://hooks.example/wf"], timeoutMs: 5000 });
+    expect(bad.warnings.join(" ")).toMatch(/WAYFINDER_ADAPTER_TIMEOUT_MS/);
+
+    const good = resolveAdapterConfig({
+      WAYFINDER_ADAPTER_NOTIFIER: "webhook",
+      WAYFINDER_WEBHOOK_URL: "https://hooks.example/wf",
+      WAYFINDER_WEBHOOK_ALLOWLIST: "https://hooks.example/wf",
+      WAYFINDER_ADAPTER_TIMEOUT_MS: "2500"
+    });
+    expect(good.notifier).toEqual({ kind: "webhook", url: "https://hooks.example/wf", allowlist: ["https://hooks.example/wf"], timeoutMs: 2500 });
+  });
 });
