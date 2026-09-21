@@ -22,6 +22,8 @@ import type { AdapterBundle } from "../adapters/types.js";
 import { nullAdapters } from "../adapters/null.js";
 import type { AdapterConfig } from "../adapters/config.js";
 import type { NotifyQueue } from "../adapters/notifyQueue.js";
+import { trackAdapterTask } from "../adapters/background.js";
+import { publishCalendar } from "../adapters/calendarLog.js";
 
 export interface ServerDeps {
   store: Store;
@@ -173,6 +175,22 @@ export function buildServer(deps: ServerDeps): McpServer {
             documentId: itemId,
             ...(result.receipt.threadKey !== undefined ? { threadKey: result.receipt.threadKey } : {})
           });
+        }
+        if (
+          result.action.status === "done"
+          && result.action.type === "schedule"
+          && typeof result.action.params.at === "string"
+          && deps.adapters !== undefined
+          && deps.adapterConfig?.calendar.kind === "ics"
+        ) {
+          const start = result.action.params.at;
+          const title = result.item.fields.sender ?? "Appointment";
+          trackAdapterTask(
+            publishCalendar(
+              { calendar: deps.adapters.calendar, store: deps.store },
+              { title, start }
+            )
+          );
         }
         return {
           content: [{ type: "text", text: result.message }],

@@ -3,7 +3,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFileStore } from "../../src/storage/fileStore.js";
-import { createNotifyQueue } from "../../src/adapters/notifyQueue.js";
+import { createConfiguredNotifyQueue, createNotifyQueue } from "../../src/adapters/notifyQueue.js";
+import { resolveAdapterConfig } from "../../src/adapters/config.js";
+import { nullAdapters } from "../../src/adapters/null.js";
 import type { Notifier } from "../../src/adapters/types.js";
 
 let store: ReturnType<typeof createFileStore>;
@@ -57,5 +59,31 @@ describe("notifyQueue", () => {
     await queue.drain();
     expect(seen).toEqual(["one", "two"]);
     expect((await store.listLedger()).map((e) => e.event)).toEqual(["external_invoked", "external_invoked"]);
+  });
+});
+
+describe("createConfiguredNotifyQueue", () => {
+  it("returns undefined when no notifier is configured", () => {
+    const queue = createConfiguredNotifyQueue(resolveAdapterConfig({}), { notifier: nullAdapters.notifier, store });
+    expect(queue).toBeUndefined();
+  });
+
+  it("returns a queue when a webhook notifier is configured", () => {
+    const config = resolveAdapterConfig({
+      WAYFINDER_ADAPTER_NOTIFIER: "webhook",
+      WAYFINDER_WEBHOOK_URL: "https://hooks.example/wf",
+      WAYFINDER_WEBHOOK_ALLOWLIST: "https://hooks.example/wf"
+    });
+    const queue = createConfiguredNotifyQueue(config, { notifier: nullAdapters.notifier, store });
+    expect(queue).toBeDefined();
+    expect(typeof queue?.enqueue).toBe("function");
+  });
+
+  it("would record a false delivery_failed for every action with a null notifier", async () => {
+    const queue = createNotifyQueue({ notifier: nullAdapters.notifier, store });
+    queue.enqueue({ event: "action_executed", summary: "Filed the water bill" });
+    await queue.drain();
+    const entries = await store.listLedger();
+    expect(entries.map((e) => e.event)).toEqual(["delivery_failed"]);
   });
 });

@@ -2,6 +2,7 @@ import type { Store } from "../storage/types.js";
 import { createLedger } from "../domain/ledgerLog.js";
 import { redactSensitive } from "../domain/redact.js";
 import type { LedgerEvent } from "../domain/model.js";
+import type { AdapterConfig } from "./config.js";
 import type { Notifier } from "./types.js";
 
 export interface NotifyJob {
@@ -16,6 +17,14 @@ export interface NotifyQueue {
   enqueue(job: NotifyJob): void;
   drain(): Promise<void>;
   close(): Promise<void>;
+}
+
+export function createConfiguredNotifyQueue(
+  config: AdapterConfig,
+  deps: { notifier: Notifier; store: Store }
+): NotifyQueue | undefined {
+  if (config.notifier.kind === "null") return undefined;
+  return createNotifyQueue(deps);
 }
 
 export function createNotifyQueue(deps: { notifier: Notifier; store: Store }): NotifyQueue {

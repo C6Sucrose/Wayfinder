@@ -32,8 +32,8 @@ export function createWebhookNotifier(deps: {
         const payload = {
           entryId: input.entryId ?? null,
           event: input.event,
-          documentId: input.documentId ?? null,
-          threadKey: input.threadKey ?? null,
+          documentId: input.documentId !== undefined ? redactSensitive(input.documentId) : null,
+          threadKey: input.threadKey !== undefined ? redactSensitive(input.threadKey) : null,
           summary: redactSensitive(input.summary)
         };
         const response = await doFetch(deps.url, {
