@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfinder — verifiable agency for the paperwork you can't glance at</title>
+<meta name="description" content="Wayfinder is a voice-first MCP server that remembers the documents you cannot glance at, tracks what is owed, acts within limits you set, and keeps a tamper-evident record it can use to prove what it did.">
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --surface: #ffffff;
+    --surface-2: #f3f1ec;
+    --fg: #191817;
+    --muted: #5d5a55;
+    --line: #e4e0d8;
+    --accent: #1f5fd6;
+    --accent-soft: #e8f0ff;
+    --ok: #14653a;
+    --ok-soft: #e6f5ec;
+    --warn: #8a4b06;
+    --warn-soft: #fdf1e0;
+    --alert: #8a1f11;
+    --alert-soft: #fdece9;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.06);
+    --maxw: 1180px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+  }
+  html[data-theme="dark"] {
+    --bg: #121315;
+    --surface: #1a1c1f;
+    --surface-2: #22252a;
+    --fg: #f2f0ec;
+    --muted: #a8a49c;
+    --line: #31353b;
+    --accent: #7aa7ff;
+    --accent-soft: #1b2a45;
+    --ok: #7fd8a2;
+    --ok-soft: #14301f;
+    --warn: #f0bf7c;
+    --warn-soft: #37280f;
+    --alert: #ff9d8d;
+    --alert-soft: #3a1a16;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  h1, h2, h3 { line-height: 1.2; }
+  h2 { font-size: 1.55rem; margin: 0 0 .5rem; letter-spacing: -.01em; }
+  h3 { font-size: 1.12rem; margin: 1.6rem 0 .4rem; }
+  p { margin: .6rem 0; }
+  code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); padding: .12em .38em; border-radius: 6px; }
+  pre { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; overflow-x: auto; position: relative; }
+  pre code { background: none; padding: 0; font-size: .86rem; }
+  .skip { position: absolute; left: -9999px; top: 0; background: var(--accent); color: #fff; padding: .6rem 1rem; z-index: 100; border-radius: 0 0 8px 0; }
+  .skip:focus { left: 0; }
+
+  /* ---------- Topbar ---------- */
+  header.top {
+    position: sticky; top: 0; z-index: 40;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .top__inner { max-width: var(--maxw); margin: 0 auto; padding: .6rem 1rem; display: flex; align-items: center; gap: .75rem; }
+  .brand { display: flex; align-items: center; gap: .6rem; font-weight: 700; letter-spacing: -.02em; }
+  .brand svg { width: 28px; height: 28px; flex: none; }
+  .brand span small { display: block; font-weight: 500; font-size: .7rem; color: var(--muted); letter-spacing: 0; }
+  .top__spacer { flex: 1; }
+  .search { position: relative; }
+  .search input {
+    width: 220px; max-width: 42vw; padding: .5rem .7rem .5rem 2rem;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); color: var(--fg); font: inherit; font-size: .9rem;
+  }
+  .search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .search svg { position: absolute; left: .55rem; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
+  .search kbd { position: absolute; right: .5rem; top: 50%; transform: translateY(-50%); font: .68rem var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: .05rem .3rem; }
+  .iconbtn {
+    border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+    border-radius: 10px; min-width: 40px; min-height: 40px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: .4rem; font: inherit; font-size: .85rem;
+  }
+  .iconbtn:hover { background: var(--surface-2); }
+  .iconbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .menu { display: none; }
+
+  /* ---------- Layout ---------- */
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 1rem 5rem; display: grid; grid-template-columns: 250px 1fr; gap: 2.5rem; align-items: start; }
+  nav.side { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow: auto; padding: 1.5rem 0; font-size: .92rem; }
+  nav.side h4 { margin: 1.1rem 0 .35rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+  nav.side a { display: block; padding: .32rem .6rem; border-radius: 8px; color: var(--muted); text-decoration: none; border-left: 2px solid transparent; }
+  nav.side a:hover { color: var(--fg); background: var(--surface-2); }
+  nav.side a.active { color: var(--accent); background: var(--accent-soft); border-left-color: var(--accent); font-weight: 600; }
+  main { padding: 1.5rem 0; min-width: 0; }
+  section.block { padding: 1.6rem 0; border-top: 1px solid var(--line); }
+  section.block:first-child { border-top: 0; }
+  .lede { font-size: 1.12rem; color: var(--muted); }
+  .kicker { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: .35rem; }
+
+  /* ---------- Hero ---------- */
+  .hero { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2rem; align-items: center; padding: 2.2rem 0 1rem; border-top: 0; }
+  .hero h1 { font-size: clamp(2rem, 4.4vw, 3rem); margin: .2rem 0 .6rem; letter-spacing: -.03em; }
+  .badges { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
+  .chip { font-size: .76rem; border: 1px solid var(--line); background: var(--surface); color: var(--muted); padding: .25rem .55rem; border-radius: 999px; }
+  .chip--ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); background: var(--ok-soft); }
+  .cta { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; }
+  .btn {
+    display: inline-flex; align-items: center; gap: .45rem; text-decoration: none;
+    border-radius: 10px; padding: .62rem 1rem; font-weight: 600; font-size: .92rem;
+    border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; font-family: inherit;
+  }
+  .btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  html[data-theme="dark"] .btn--primary { color: #0d1017; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Cards ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; margin-top: 1rem; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.05rem 1.1rem; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 .3rem; font-size: 1rem; }
+  .card p { margin: 0; color: var(--muted); font-size: .92rem; }
+  .num { font: 700 .72rem var(--mono); color: var(--accent); letter-spacing: .08em; }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: .85rem 1rem; border-radius: 0 10px 10px 0; margin: 1rem 0; }
+  .callout--ok { border-left-color: var(--ok); background: var(--ok-soft); }
+  .callout--warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout p:first-child { margin-top: 0; } .callout p:last-child { margin-bottom: 0; }
+
+  /* ---------- Pipeline ---------- */
+  .pipe { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: 1.2rem 0 .4rem; }
+  .pipe__step {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: .8rem .7rem; text-align: center;
+    opacity: .5; transition: opacity .35s ease, transform .35s ease, border-color .35s ease, box-shadow .35s ease;
+  }
+  .pipe__step b { display: block; font-size: .86rem; }
+  .pipe__step span { font-size: .74rem; color: var(--muted); }
+  .pipe__step.on { opacity: 1; transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .pipe__bar { grid-column: 1 / -1; height: 3px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-top: .35rem; }
+  .pipe__bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s linear; }
+  .controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
+  .controls .hint { color: var(--muted); font-size: .82rem; }
+
+  /* ---------- Tabs ---------- */
+  .tabs { margin-top: 1rem; }
+  .tablist { display: flex; gap: .3rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+  .tablist button {
+    border: 0; background: none; color: var(--muted); font: inherit; font-size: .9rem; font-weight: 600;
+    padding: .55rem .8rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tablist button:hover { color: var(--fg); }
+  .tablist button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .tablist button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .tabpanel { padding-top: .9rem; }
+  .tabpanel[hidden] { display: none; }
+
+  /* ---------- Copy button ---------- */
+  .copy { position: absolute; top: .5rem; right: .5rem; font: 600 .72rem var(--sans); border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 7px; padding: .28rem .5rem; cursor: pointer; }
+  .copy:hover { color: var(--fg); background: var(--surface-2); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---------- Table ---------- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); margin-top: .8rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: left; padding: .62rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--surface-2); font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  tr:last-child td { border-bottom: 0; }
+
+  /* ---------- Simulator ---------- */
+  .sim { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; align-items: start; }
+  .sim fieldset { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 1rem; margin: 0; }
+  .sim legend { font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 0 .35rem; }
+  .field { margin: .7rem 0; }
+  .field label { display: flex; justify-content: space-between; font-size: .86rem; gap: 1rem; }
+  .field output { font-family: var(--mono); font-size: .85rem; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .field select { width: 100%; padding: .45rem; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font: inherit; }
+  .verdict { border-radius: var(--radius); padding: 1rem; border: 1px solid var(--line); background: var(--surface-2); }
+  .verdict__k { font: 700 .72rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  .verdict--allow { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
+  .verdict--allow .verdict__k { color: var(--ok); }
+  .verdict--confirm { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+  .verdict--confirm .verdict__k { color: var(--warn); }
+  .verdict--refuse { background: var(--alert-soft); border-color: color-mix(in srgb, var(--alert) 35%, var(--line)); }
+  .verdict--refuse .verdict__k { color: var(--alert); }
+  .verdict--escalate { background: var(--accent-soft); }
+  .verdict p { margin: .35rem 0 0; font-size: .9rem; }
+  .lamp { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; margin-right: .4rem; vertical-align: middle; }
+
+  /* ---------- FAQ ---------- */
+  details.faq { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin: .5rem 0; }
+  details.faq summary { cursor: pointer; padding: .8rem 1rem; font-weight: 600; }
+  details.faq summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
+  details.faq[open] summary { border-bottom: 1px solid var(--line); }
+  details.faq .body { padding: .2rem 1rem .9rem; color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); margin-top: 2rem; padding: 1.5rem 0 0; color: var(--muted); font-size: .88rem; }
+  .hidden { display: none !important; }
+  .noresult { color: var(--muted); font-size: .85rem; padding: .5rem .6rem; }
+
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; gap: 0; }
+    nav.side { display: none; position: sticky; top: 64px; background: var(--bg); border-bottom: 1px solid var(--line); max-height: 60vh; padding: .5rem 0 1rem; }
+    nav.side.open { display: block; }
+    .menu { display: inline-flex; }
+    .hero { grid-template-columns: 1fr; }
+    .sim { grid-template-columns: 1fr; }
+    .pipe { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="top__inner">
+    <span class="brand" aria-label="Wayfinder">
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <circle cx="16" cy="16" r="13" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+        <path d="M16 6.5 19.8 16 16 25.5 12.2 16Z" fill="var(--accent)"/>
+        <circle cx="16" cy="16" r="2.4" fill="var(--bg)"/>
+      </svg>
+      <span>Wayfinder<small>Verifiable agency</small></span>
+    </span>
+    <span class="top__spacer"></span>
+    <button class="iconbtn menu" id="menu" aria-expanded="false" aria-controls="side">Contents</button>
+    <span class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      <label class="hidden" for="q">Search the documentation</label>
+      <input id="q" type="search" placeholder="Search" autocomplete="off" aria-controls="side">
+      <kbd>/</kbd>
+    </span>
+    <button class="iconbtn" id="theme" aria-pressed="false" title="Toggle color theme"><span id="themeLabel">Dark</span></button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="side" id="side" aria-label="Contents">
+    <h4>Getting started</h4>
+    <a href="#overview">Overview</a>
+    <a href="#why">Why it exists</a>
+    <a href="#quickstart">Quick start</a>
+    <a href="#how">How a request flows</a>
+    <h4>Using it</h4>
+    <a href="#workflow">The workflow</a>
+    <a href="#screens">Screens</a>
+    <a href="#envelope">The envelope</a>
+    <a href="#simulator">Try the envelope</a>
+    <h4>Trust</h4>
+    <a href="#record">The record</a>
+    <a href="#safety">Safety and privacy</a>
+    <a href="#accessibility">Accessibility</a>
+    <h4>Extending</h4>
+    <a href="#integrations">Optional integrations</a>
+    <a href="#reference">MCP reference</a>
+    <a href="#develop">Development</a>
+    <a href="#faq">FAQ</a>
+    <p class="noresult hidden" id="noresult">No sections match that search.</p>
+  </nav>
+
+  <main id="main">
+
+    <section class="block hero" id="overview" data-title="Overview" data-keywords="wayfinder overview mcp server blind low vision voice first paper letter bill agency">
+      <div>
+        <p class="kicker">Voice-first MCP server</p>
+        <h1>Verifiable agency for the paperwork you can't glance at.</h1>
+        <p class="lede">Wayfinder remembers every document a blind or low-vision person cannot glance at, correlates them into threads, tracks what is still owed and at risk, acts within limits the user sets, and can <strong>prove</strong> what it did.</p>
+        <div class="badges">
+          <span class="chip chip--ok">Runs fully offline</span>
+          <span class="chip">Node 22+</span>
+          <span class="chip">MIT licensed</span>
+          <span class="chip">MCP Apps screens</span>
+          <span class="chip">385 tests</span>
+        </div>
+        <div class="cta">
+          <a class="btn btn--primary" href="#quickstart">Quick start</a>
+          <button class="btn" type="button" data-scroll="#record">How the proof works</button>
+        </div>
+      </div>
+      <div class="card" aria-label="The three pillars">
+        <span class="num">THREE PILLARS</span>
+        <h3>Abstention, envelope, ledger</h3>
+        <p><strong>Abstention</strong> protects the input: it refuses to act on a document it is unsure it read.</p>
+        <p><strong>The envelope</strong> bounds the action: every step is checked against your limits before anything changes.</p>
+        <p><strong>The ledger</strong> proves the output: every decision gets a receipt in a tamper-evident record.</p>
+      </div>
+    </section>
+
+    <section class="block" id="why" data-title="Why it exists" data-keywords="why problem fraud disbelieved thesis auditable bounded accountable agency perception input">
+      <p class="kicker">Why it exists</p>
+      <h2>Sighted people verify state by looking. A blind person cannot.</h2>
+      <p>People who cannot see a document are disproportionately targeted by fraud, and routinely disbelieved when they assert what it said. Access to information is not the hard problem — <strong>auditable, bounded, accountable agency</strong> is.</p>
+      <p>Reading a letter, bill, or label is an <em>input</em>. The product is the durable, verifiable handler for the paperwork a person cannot glance at. So Wayfinder is built around three ideas no commodity reader provides on its own:</p>
+      <div class="cards">
+        <div class="card"><span class="num">01</span><h3>Calibrated abstention</h3><p>Two reads of the same image are compared, and deterministic checks (an account number's checksum, date plausibility, amount sanity) run with no model involved. A low-confidence item is never auto-acted.</p></div>
+        <div class="card"><span class="num">02</span><h3>A bounded envelope</h3><p>Actions are evaluated against forbidden types, the confidence policy, and your amount thresholds — before any state changes. Refusals are first-class and offer escalation.</p></div>
+        <div class="card"><span class="num">03</span><h3>A verifiable ledger</h3><p>An append-only, hash-chained log with a receipt for every decision, redacted at write, exportable with a terminal hash anyone can check.</p></div>
+      </div>
+      <div class="callout"><p><strong>The honest claim.</strong> We do not claim bank integration or legal evidentiary weight. We claim the record is internally consistent and tamper-evident: it can prove what the system saw and did, and that it was not altered afterwards.</p></div>
+    </section>
+
+    <section class="block" id="quickstart" data-title="Quick start" data-keywords="quick start install npm build start run demo client port 8080 5173 configuration environment variables bed rock">
+      <p class="kicker">Quick start</p>
+      <h2>Run it in two terminals</h2>
+      <p>Requires Node.js 22 or newer. <strong>No AWS account is needed</strong> — without cloud credentials the server uses a deterministic rule-based brain and still works end to end.</p>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Runner">
+          <button role="tab" id="tab-run-1" aria-controls="panel-run-1" aria-selected="true">Server</button>
+          <button role="tab" id="tab-run-2" aria-controls="panel-run-2" aria-selected="false">Demo client</button>
+        </div>
+        <div class="tabpanel" id="panel-run-1" role="tabpanel" aria-labelledby="tab-run-1">
+          <pre><code>npm install
+npm run build      # bundle the MCP App view, then compile TypeScript
+npm start          # MCP server on http://127.0.0.1:8080</code></pre>
+        </div>
+        <div class="tabpanel" id="panel-run-2" role="tabpanel" aria-labelledby="tab-run-2" hidden>
+          <pre><code>npm run dev:web    # open http://127.0.0.1:5173
+# proxies /api and /mcp to the server on :8080</code></pre>
+        </div>
+      </div>
+      <h3>Say these</h3>
+      <div class="cards">
+        <div class="card"><p>"Read my mail."</p></div>
+        <div class="card"><p>"What's due today?"</p></div>
+        <div class="card"><p>"What do I need to deal with?"</p></div>
+        <div class="card"><p>"Prove it."</p></div>
+      </div>
+      <h3>Configuration</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>PORT</code></td><td><code>8080</code></td><td>Server port</td></tr>
+            <tr><td><code>WAYFINDER_DATA_DIR</code></td><td><code>data</code></td><td>Where items, objects, preferences, and the ledger are stored</td></tr>
+            <tr><td><code>WAYFINDER_CAPTURE_ROOT</code></td><td>data dir</td><td>Root the image reader may read from</td></tr>
+            <tr><td><code>ALLOWED_ORIGINS</code></td><td><em>empty</em></td><td>Comma-separated origins accepted for <code>/mcp</code> and <code>/api/agent</code></td></tr>
+            <tr><td><code>BEDROCK_MODEL_ID</code></td><td><em>unset</em></td><td>Enables the Bedrock brain and image reader</td></tr>
+            <tr><td><code>AWS_REGION</code></td><td><code>eu-central-1</code></td><td>Region for Bedrock</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="how" data-title="How a request flows" data-keywords="architecture flow host brain server domain store adapters resources view sandboxed iframe">
+      <p class="kicker">How a request flows</p>
+      <h2>From your voice to a receipt</h2>
+      <p>Watch the pipeline. The host is an MCP client; the brain turns your words into tool calls; the domain does the deterministic work; optional adapters run strictly <em>off</em> the request path, so the response is never slowed by the network.</p>
+      <div class="pipe" id="pipeline" aria-hidden="true">
+        <div class="pipe__step"><b>Capture</b><span>read the image</span></div>
+        <div class="pipe__step"><b>Correlate</b><span>threads and urgency</span></div>
+        <div class="pipe__step"><b>Authority</b><span>allow, ask, refuse</span></div>
+        <div class="pipe__step"><b>Record</b><span>hash-chained receipt</span></div>
+        <div class="pipe__bar"><i id="pipebar"></i></div>
+      </div>
+      <div class="controls">
+        <button class="btn btn--primary" type="button" id="playpipe">Play the pipeline</button>
+        <span class="hint" id="pipehint">Adapters run after the tool response — the handler budget stays under 500 ms.</span>
+      </div>
+    </section>
+
+    <section class="block" id="workflow" data-title="The workflow" data-keywords="workflow capture review audit act prove escalate steps get_backlog daily_briefing">
+      <p class="kicker">Using it</p>
+      <h2>The workflow</h2>
+      <div class="cards">
+        <div class="card"><span class="num">1</span><h3>Capture</h3><p>Read a photo or upload into structured documents, with confidence and demands.</p></div>
+        <div class="card"><span class="num">2</span><h3>Review</h3><p><code>get_backlog</code> and <code>daily_briefing</code> rank open threads by deadline risk and reminders.</p></div>
+        <div class="card"><span class="num">3</span><h3>Ask why</h3><p><code>get_audit</code> explains what happened, straight from the ledger.</p></div>
+        <div class="card"><span class="num">4</span><h3>Act</h3><p><code>act_on_item</code> consults your envelope before anything changes.</p></div>
+        <div class="card"><span class="num">5</span><h3>Prove</h3><p><code>verify_ledger</code> recomputes the chain; <code>export_record</code> writes a report with the terminal hash.</p></div>
+        <div class="card"><span class="num">6</span><h3>Escalate</h3><p>A refusal is not a dead end: hand it to your trusted contact, and record it.</p></div>
+      </div>
+    </section>
+
+    <section class="block" id="screens" data-title="Screens" data-keywords="screens backlog audit history verification badge refusal card mcp app view accessibility cards">
+      <p class="kicker">On screen</p>
+      <h2>Four screens that match what is spoken</h2>
+      <p>The same results are voiced and shown, as accessible cards rendered into any MCP Apps host.</p>
+      <div class="cards">
+        <div class="card" style="border-left:4px solid var(--accent)"><h3>Backlog</h3><p>Threads ranked by urgency, each with sender, demand, deadline, reminder count, and related documents.</p></div>
+        <div class="card" style="border-left:4px solid var(--accent)"><h3>Audit history</h3><p>A timeline of ledger events for a document or thread.</p></div>
+        <div class="card" style="border-left:4px solid var(--ok)"><h3>Verification badge</h3><p>The <code>verify_ledger</code> result: chain verified, entry count, and terminal hash — or the first altered entry.</p></div>
+        <div class="card" style="border-left:4px solid var(--alert)"><h3>Refusal card</h3><p>The reason an action was refused, with a one-tap escalate affordance.</p></div>
+      </div>
+    </section>
+
+    <section class="block" id="envelope" data-title="The envelope" data-keywords="authority envelope forbidden low confidence confirm threshold auto-act refuse escalate policy limits amount currency">
+      <p class="kicker">Governance, not vibes</p>
+      <h2>The envelope decides before anything changes</h2>
+      <p>Every action is evaluated against forbidden types, your low-confidence policy, and your amount thresholds — <em>before</em> any state change.</p>
+      <div class="cards">
+        <div class="card"><h3>Forbidden</h3><p>Action types you have disallowed are refused outright, with the reason recorded.</p></div>
+        <div class="card"><h3>Low confidence</h3><p>Your policy chooses: ask, refuse, or escalate. Never silently act.</p></div>
+        <div class="card"><h3>Above your limit</h3><p>Actions over the amount you set require your confirmation first.</p></div>
+      </div>
+      <div class="callout callout--warn"><p><strong>Confirmation is recorded confirmation.</strong> The system records that you confirmed. It is not independently verified. An unconfirmed action past its deadline is escalated to your trusted contact — never silently assumed.</p></div>
+    </section>
+
+    <section class="block" id="simulator" data-title="Try the envelope" data-keywords="simulator interactive try authority limit amount confirm refuse compute decision">
+      <p class="kicker">Interactive</p>
+      <h2>Try the envelope</h2>
+      <p>Move the sliders. The same rules that govern the real system decide here, in real time.</p>
+      <div class="sim">
+        <fieldset>
+          <legend>Your envelope and the action</legend>
+          <div class="field">
+            <label for="autoAct">Auto-act up to <output id="autoActOut">EUR 50</output></label>
+            <input type="range" id="autoAct" min="0" max="500" step="10" value="50">
+          </div>
+          <div class="field">
+            <label for="confirmAbove">Confirm from <output id="confirmAboveOut">EUR 0</output></label>
+            <input type="range" id="confirmAbove" min="0" max="500" step="10" value="0">
+          </div>
+          <div class="field">
+            <label for="amount">Action amount <output id="amountOut">EUR 40</output></label>
+            <input type="range" id="amount" min="0" max="500" step="10" value="40">
+          </div>
+          <div class="field">
+            <label for="currency">Amount currency</label>
+            <select id="currency"><option>EUR</option><option>USD</option><option>GBP</option></select>
+          </div>
+          <div class="field">
+            <label for="confidence">Read confidence</label>
+            <select id="confidence">
+              <option value="high">high</option>
+              <option value="low-ask">low — policy: ask</option>
+              <option value="low-refuse">low — policy: refuse</option>
+              <option value="low-escalate">low — policy: escalate</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="forbidden">Forbidden action types</label>
+            <select id="forbidden">
+              <option value="none">none</option>
+              <option value="discard_document">discard document</option>
+              <option value="share_personal_data">share personal data</option>
+            </select>
+          </div>
+        </fieldset>
+        <div>
+          <div class="verdict" id="verdict" role="status" aria-live="polite">
+            <span class="verdict__k"><span class="lamp"></span><span id="vk">allow</span></span>
+            <p id="vreason"></p>
+          </div>
+          <div class="controls">
+            <button class="btn" type="button" id="simAction">Run a discard action</button>
+            <button class="btn" type="button" id="simAction2">Run a payment action</button>
+          </div>
+          <div class="callout"><p>A refusal is spoken with its reason and written to the ledger as <code>action_refused</code>, and the response offers escalation to your trusted contact.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="record" data-title="The record" data-keywords="ledger hash chain sha256 append-only redacted verify tamper-evident export terminal hash receipt">
+      <p class="kicker">Trust</p>
+      <h2>A receipt for every decision</h2>
+      <div class="cards">
+        <div class="card"><h3>Append-only and hash-chained</h3><p>Each entry commits to the previous hash, so altering any field breaks every entry after it.</p></div>
+        <div class="card"><h3>Redacted at write</h3><p>Sensitive details such as account numbers are redacted before hashing, so the chain never commits to them in the clear.</p></div>
+        <div class="card"><h3>Verifiable and exportable</h3><p>Verification recomputes the chain; the exported report carries the terminal hash so anyone can check it independently.</p></div>
+      </div>
+      <h3>Try <code>verify_ledger</code></h3>
+      <pre><code>{
+  "ok": true,
+  "entries": 14,
+  "terminal": "9f2c…c41a"
+}
+// "14 documents, 9 actions, chain verified. Nothing has been altered."</code></pre>
+    </section>
+
+    <section class="block" id="safety" data-title="Safety and privacy" data-keywords="safety privacy no payment execution no advice no emergency minimal data deletion purge delivery_failed local by default">
+      <p class="kicker">Trust</p>
+      <h2>Safety and privacy</h2>
+      <div class="cards">
+        <div class="card"><h3>No payment execution</h3><p>A payment handoff prepares an instruction and a SEPA QR payload for you to complete in your own banking app. The ledger records that a handoff was prepared — not that money moved. Invalid account numbers are refused.</p></div>
+        <div class="card"><h3>No advice, no emergency claims</h3><p>It reports what a document says. It does not give medical or financial advice, and it does not claim real-time surveillance or emergency response.</p></div>
+        <div class="card"><h3>Minimal data, local by default</h3><p>Records and the ledger live in your data directory. Deleting a document purges its content and appends a <code>closed</code> entry that the purge happened, so verification reports it rather than hiding it.</p></div>
+        <div class="card"><h3>No silent failures</h3><p>A delivery failure appends <code>delivery_failed</code> and is spoken. With no integrations configured, nothing leaves the process.</p></div>
+      </div>
+    </section>
+
+    <section class="block" id="accessibility" data-title="Accessibility" data-keywords="accessibility voice-first keyboard large text aria live regions focus cards contrast">
+      <p class="kicker">Accessibility</p>
+      <h2>Voice-first, and fully keyboard-operable</h2>
+      <div class="cards">
+        <div class="card"><h3>Everything is spoken</h3><p>Results, refusal reasons, and verification outcomes are voiced — never screen-only.</p></div>
+        <div class="card"><h3>Native controls</h3><p>Every control is a native button or input, with visible focus outlines and at least 48px targets.</p></div>
+        <div class="card"><h3>Large text</h3><p>A toggle that scales the interface, synchronized with <code>aria-pressed</code>.</p></div>
+        <div class="card"><h3>Live regions</h3><p>The transcript and brain badge announce changes for screen readers.</p></div>
+      </div>
+    </section>
+
+    <section class="block" id="integrations" data-title="Optional integrations" data-keywords="adapters ports null notifier webhook calendar ics payment epc signature document source assist disabled by default conformance">
+      <p class="kicker">Extending</p>
+      <h2>Optional integrations, off by default</h2>
+      <p>Optional services sit behind small ports. Each ships a <strong>null adapter</strong> that preserves today's behaviour, and each is inert unless you configure it. Nothing is required.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Port</th><th>Default (null)</th><th>Reference adapter</th></tr></thead>
+          <tbody>
+            <tr><td><code>Notifier</code></td><td>Ledger + spoken reply</td><td>Webhook</td></tr>
+            <tr><td><code>CalendarSink</code></td><td>Internal ledger</td><td>ICS file</td></tr>
+            <tr><td><code>PaymentHandoff</code></td><td>Spoken instruction + ledger</td><td>EPC QR</td></tr>
+            <tr><td><code>SignatureProvider</code></td><td>Local SHA-256 chain</td><td>Recipe: KMS, RFC 3161</td></tr>
+            <tr><td><code>DocumentSource</code></td><td>Camera / upload</td><td>Recipe: IMAP, watched folder</td></tr>
+            <tr><td><code>AssistProvider</code></td><td>None</td><td>Recipe: Be My Eyes / Aira</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Adapter example">
+          <button role="tab" id="tab-ad-1" aria-controls="panel-ad-1" aria-selected="true">Validate</button>
+          <button role="tab" id="tab-ad-2" aria-controls="panel-ad-2" aria-selected="false">Webhook notifier</button>
+        </div>
+        <div class="tabpanel" id="panel-ad-1" role="tabpanel" aria-labelledby="tab-ad-1">
+          <pre><code>npm run adapters:conformance
+# constructs every configured adapter and runs its contract suite</code></pre>
+        </div>
+        <div class="tabpanel" id="panel-ad-2" role="tabpanel" aria-labelledby="tab-ad-2" hidden>
+          <pre><code>WAYFINDER_ADAPTER_NOTIFIER=webhook
+WAYFINDER_WEBHOOK_URL=https://example.invalid/hook
+WAYFINDER_WEBHOOK_ALLOWLIST=https://example.invalid/hook
+WAYFINDER_ADAPTER_TIMEOUT_MS=5000</code></pre>
+        </div>
+      </div>
+      <p>Rules for every adapter: HTTPS only, an exact-URL allowlist, a hard timeout, payloads redacted before transmit, idempotent delivery, and failures recorded as <code>delivery_failed</code>. Recipes live in <code>docs/adapters/</code>.</p>
+    </section>
+
+    <section class="block" id="reference" data-title="MCP reference" data-keywords="tools resources mcp reference capture_scan get_scan act_on_item verify_ledger export_record escalate prepare_payment backlog audit resources inbox objects ledger capabilities">
+      <p class="kicker">Reference</p>
+      <h2>MCP surface</h2>
+      <h3>Tools</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>capture_scan</code></td><td>Start reading captured images (mail, labels, objects, scenes)</td></tr>
+            <tr><td><code>get_scan</code></td><td>Return the items found in a scan</td></tr>
+            <tr><td><code>identify_product</code></td><td>Read a label back verbatim, with a health disclaimer</td></tr>
+            <tr><td><code>remember_object</code></td><td>Remember where an object is</td></tr>
+            <tr><td><code>find_object</code></td><td>Find where an object was last seen</td></tr>
+            <tr><td><code>list_items</code> · <code>get_item</code></td><td>List items, or read one item's full detail</td></tr>
+            <tr><td><code>get_backlog</code></td><td>Threads ranked by urgency, with demands and documents</td></tr>
+            <tr><td><code>get_audit</code></td><td>Ledger history for a document or thread</td></tr>
+            <tr><td><code>act_on_item</code></td><td>Carry out an action, after the envelope decides</td></tr>
+            <tr><td><code>escalate_item</code></td><td>Hand an unresolved item to the trusted contact</td></tr>
+            <tr><td><code>verify_ledger</code></td><td>Recompute the chain and report the terminal hash</td></tr>
+            <tr><td><code>export_record</code></td><td>Voice-friendly situation report for a period</td></tr>
+            <tr><td><code>prepare_payment</code></td><td>Prepare a payment handoff (instruction + EPC QR); never moves money</td></tr>
+            <tr><td><code>update_preferences</code></td><td>Verbosity, trusted contact, large text</td></tr>
+            <tr><td><code>daily_briefing</code></td><td>Deadline-risk-ordered summary for the day</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Resources</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Resource</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td><code>wayfinder://inbox</code></td><td>The unresolved items</td></tr>
+            <tr><td><code>wayfinder://objects</code></td><td>Remembered objects and last-seen locations</td></tr>
+            <tr><td><code>wayfinder://ledger</code></td><td>Ledger entries and their verification result</td></tr>
+            <tr><td><code>wayfinder://capabilities</code></td><td>What is actually wired, never what is merely possible</td></tr>
+            <tr><td><code>ui://wayfinder/app.html</code></td><td>The interactive MCP App view</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A <code>morning_briefing</code> prompt is also exposed.</p>
+    </section>
+
+    <section class="block" id="develop" data-title="Development" data-keywords="development tests typecheck lint vitest prettier conformance contributing project layout source">
+      <p class="kicker">Development</p>
+      <h2>Working on Wayfinder</h2>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Development command">
+          <button role="tab" id="tab-dev-1" aria-controls="panel-dev-1" aria-selected="true">Test</button>
+          <button role="tab" id="tab-dev-2" aria-controls="panel-dev-2" aria-selected="false">Check</button>
+          <button role="tab" id="tab-dev-3" aria-controls="panel-dev-3" aria-selected="false">Format</button>
+        </div>
+        <div class="tabpanel" id="panel-dev-1" role="tabpanel" aria-labelledby="tab-dev-1">
+          <pre><code>npm test</code></pre>
+        </div>
+        <div class="tabpanel" id="panel-dev-2" role="tabpanel" aria-labelledby="tab-dev-2" hidden>
+          <pre><code>npm run typecheck
+npm run lint
+npm run adapters:conformance</code></pre>
+        </div>
+        <div class="tabpanel" id="panel-dev-3" role="tabpanel" aria-labelledby="tab-dev-3" hidden>
+          <pre><code>npm run format</code></pre>
+        </div>
+      </div>
+      <p>Domain logic is pure where it matters: correlation, the authority decision, account validation, and ledger hashing are all unit-tested with no network and no model. The line for the whole project is that the deterministic core is the product; the model is an input.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Path</th><th>Responsibility</th></tr></thead>
+          <tbody>
+            <tr><td><code>src/domain/</code></td><td>Pure domain logic: model, correlation, authority, ledger, backlog, copy</td></tr>
+            <tr><td><code>src/mcp/</code></td><td>MCP server: tools, resources, the app resource</td></tr>
+            <tr><td><code>src/server/</code></td><td>HTTP host: Express app, agent endpoint, MCP transport</td></tr>
+            <tr><td><code>src/scan/</code></td><td>Scan worker and the Bedrock image reader</td></tr>
+            <tr><td><code>src/agent/</code></td><td>Agent brains (rules and Bedrock) and the MCP executor</td></tr>
+            <tr><td><code>src/adapters/</code></td><td>Ports, null adapters, config, registry, notify queue, reference adapters</td></tr>
+            <tr><td><code>ui/</code> · <code>web/</code></td><td>The MCP App view, and the demo host client</td></tr>
+            <tr><td><code>test/</code></td><td>Vitest suites</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block" id="faq" data-title="FAQ" data-keywords="faq questions bank integration payment legal evidence offline aws bed rock confidence confirmation fraud scam deletion">
+      <p class="kicker">FAQ</p>
+      <h2>Questions people ask</h2>
+      <details class="faq"><summary>Can it pay my bills?</summary><div class="body"><p>No. It prepares the payment — a spoken instruction and a SEPA QR payload you scan in <em>your own</em> banking app — and records that a handoff was prepared. Wayfinder never executes a payment or holds your credentials.</p></div></details>
+      <details class="faq"><summary>Is the ledger legal evidence?</summary><div class="body"><p>We do not claim legal or evidentiary weight. The honest claim is narrower and still useful: the record is internally consistent and tamper-evident, so it can prove what the system saw and did, and that it was not altered afterwards.</p></div></details>
+      <details class="faq"><summary>What happens when it misreads a document?</summary><div class="body"><p>Two independent reads are compared and deterministic checks run (an account number's checksum, date plausibility, amount sanity). A disagreement on a critical field marks the document low-confidence, and a low-confidence item is never auto-acted — your policy chooses ask, refuse, or escalate.</p></div></details>
+      <details class="faq"><summary>Does it need the cloud?</summary><div class="body"><p>No. Without credentials it runs a deterministic rule brain and reports the image reader as unavailable; correlation, the envelope, the ledger, and every screen still work. Setting a Bedrock model id adds a natural-language brain and a real image reader.</p></div></details>
+      <details class="faq"><summary>Is it monitoring me?</summary><div class="body"><p>No. The only monitoring permitted is a channel you own and consent to — your mailbox, your watched folder, your inbound webhook — delivering documents into the same pipeline as a photo. There is no surveillance or emergency-detection claim.</p></div></details>
+      <details class="faq"><summary>What about fraud?</summary><div class="body"><p>Correlation and deterministic checks catch the cheap tells: a claimed sender that does not match, a reminder pattern, a demand for an unusual payment instrument, or a failing account checksum. The ledger then makes the reasoning reviewable rather than a black box.</p></div></details>
+      <details class="faq"><summary>Can I delete a document?</summary><div class="body"><p>Yes. Deletion removes the stored content and appends a <code>closed</code> entry recording that the content was purged. The chain stays verifiable for everything that remains, and verification reports the purge rather than hiding it.</p></div></details>
+    </section>
+
+    <footer>
+      <p><strong>Wayfinder</strong> — verifiable agency for the paperwork you can't glance at. MIT licensed. Built for the Amazon Hackathon.</p>
+      <p>This page is self-contained: no external scripts, styles, or fonts. <a href="../README.md">README</a> · <a href="demo-script.md">Demo script</a> · <a href="adapters/">Adapter recipes</a></p>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* Theme */
+  var root = document.documentElement;
+  var themeBtn = document.getElementById("theme");
+  var themeLabel = document.getElementById("themeLabel");
+  function applyTheme(t) {
+    root.setAttribute("data-theme", t);
+    themeBtn.setAttribute("aria-pressed", t === "dark" ? "true" : "false");
+    themeLabel.textContent = t === "dark" ? "Light" : "Dark";
+  }
+  var stored = null;
+  try { stored = localStorage.getItem("wf-theme"); } catch (e) {}
+  var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(stored || (prefersDark ? "dark" : "light"));
+  themeBtn.addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+    try { localStorage.setItem("wf-theme", next); } catch (e) {}
+  });
+
+  /* Mobile menu */
+  var menu = document.getElementById("menu");
+  var side = document.getElementById("side");
+  menu.addEventListener("click", function () {
+    var open = side.classList.toggle("open");
+    menu.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  /* Tabs (roving, keyboard support) */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tabs]"), function (group) {
+    var tabs = Array.prototype.slice.call(group.querySelectorAll('[role="tab"]'));
+    function select(i) {
+      tabs.forEach(function (tab, j) {
+        var on = i === j;
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        var panel = document.getElementById(tab.getAttribute("aria-controls"));
+        if (panel) panel.hidden = !on;
+      });
+    }
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener("click", function () { select(i); });
+      tab.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          var next = (i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
+          tabs[next].focus();
+          select(next);
+        }
+      });
+    });
+  });
+
+  /* Copy buttons */
+  Array.prototype.forEach.call(document.querySelectorAll("pre"), function (pre) {
+    var code = pre.querySelector("code");
+    if (!code) return;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copy";
+    btn.textContent = "Copy";
+    btn.addEventListener("click", function () {
+      var text = code.innerText;
+      var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta); done();
+      }
+    });
+    pre.appendChild(btn);
+  });
+
+  /* Section buttons */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-scroll]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var target = document.querySelector(btn.getAttribute("data-scroll"));
+      if (target) target.scrollIntoView({ block: "start" });
+    });
+  });
+
+  /* Scroll-spy */
+  var links = Array.prototype.slice.call(side.querySelectorAll('a[href^="#"]'));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute("href")); }).filter(Boolean);
+  function setActive(id) {
+    links.forEach(function (a) { a.classList.toggle("active", a.getAttribute("href") === "#" + id); });
+  }
+  if ("IntersectionObserver" in window) {
+    var visible = {};
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { visible[en.target.id] = en.isIntersecting ? en.intersectionRatio : 0; });
+      var best = null, bestRatio = 0;
+      sections.forEach(function (s) {
+        var r = visible[s.id] || 0;
+        if (r > bestRatio) { bestRatio = r; best = s.id; }
+      });
+      if (best) setActive(best);
+    }, { rootMargin: "-72px 0px -55% 0px", threshold: [0, 0.15, 0.4, 0.75, 1] });
+    sections.forEach(function (s) { obs.observe(s); });
+  }
+
+  /* Search filter */
+  var q = document.getElementById("q");
+  var noresult = document.getElementById("noresult");
+  var blocks = Array.prototype.slice.call(document.querySelectorAll("section.block"));
+  function filter() {
+    var term = q.value.trim().toLowerCase();
+    var hits = 0;
+    blocks.forEach(function (b) {
+      if (!term) { b.classList.remove("hidden"); hits++; return; }
+      var hay = (b.getAttribute("data-title") + " " + b.getAttribute("data-keywords") + " " + b.textContent).toLowerCase();
+      var match = hay.indexOf(term) !== -1;
+      b.classList.toggle("hidden", !match);
+      if (match) hits++;
+    });
+    links.forEach(function (a) {
+      var sec = document.querySelector(a.getAttribute("href"));
+      if (sec) a.style.display = sec.classList.contains("hidden") ? "none" : "";
+    });
+    noresult.classList.toggle("hidden", hits !== 0 || !term);
+    Array.prototype.forEach.call(side.querySelectorAll("h4"), function (h) {
+      var any = false, n = h.nextElementSibling;
+      while (n && n.tagName === "A") { if (n.style.display !== "none") any = true; n = n.nextElementSibling; }
+      h.style.display = any || !term ? "" : "none";
+    });
+  }
+  q.addEventListener("input", filter);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && document.activeElement !== q && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) {
+      e.preventDefault(); q.focus();
+    }
+    if (e.key === "Escape" && document.activeElement === q) { q.value = ""; filter(); q.blur(); }
+  });
+
+  /* Pipeline animation */
+  var steps = Array.prototype.slice.call(document.querySelectorAll(".pipe__step"));
+  var bar = document.getElementById("pipebar");
+  var playBtn = document.getElementById("playpipe");
+  var timers = [];
+  function resetPipe() {
+    timers.forEach(clearTimeout); timers = [];
+    steps.forEach(function (s) { s.classList.remove("on"); });
+    bar.style.width = "0%";
+  }
+  function playPipe() {
+    resetPipe();
+    steps.forEach(function (s, i) {
+      timers.push(setTimeout(function () {
+        steps.forEach(function (x, j) { x.classList.toggle("on", j <= i); });
+        bar.style.width = Math.round(((i + 1) / steps.length) * 100) + "%";
+      }, i * 700));
+    });
+  }
+  playBtn.addEventListener("click", playPipe);
+  if ("IntersectionObserver" in window) {
+    var once = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { playPipe(); once.disconnect(); }
+      });
+    }, { threshold: 0.4 });
+    var pipe = document.getElementById("pipeline");
+    if (pipe) once.observe(pipe);
+  } else { playPipe(); }
+
+  /* Envelope simulator */
+  var autoAct = document.getElementById("autoAct");
+  var confirmAbove = document.getElementById("confirmAbove");
+  var amount = document.getElementById("amount");
+  var currency = document.getElementById("currency");
+  var confidence = document.getElementById("confidence");
+  var forbidden = document.getElementById("forbidden");
+  var verdict = document.getElementById("verdict");
+  var vk = document.getElementById("vk");
+  var vreason = document.getElementById("vreason");
+  var actionKind = "discard_document";
+
+  function money(sel, out) { out.textContent = "EUR " + sel.value; }
+  function syncLabels() {
+    money(autoAct, document.getElementById("autoActOut"));
+    money(confirmAbove, document.getElementById("confirmAboveOut"));
+    money(amount, document.getElementById("amountOut"));
+  }
+  function evaluate() {
+    var auto = Number(autoAct.value);
+    var conf = Number(confirmAbove.value);
+    if (conf > auto) { // mirror the model constraint: confirmAbove never exceeds autoActUpTo
+      conf = auto;
+      confirmAbove.value = String(auto);
+      syncLabels();
+    }
+    var amt = Number(amount.value);
+    var cur = currency.value;
+    var confSel = confidence.value;
+    var forb = forbidden.value;
+
+    var decision = "allow";
+    var reason = "Within your limits. I can carry this out and record it.";
+
+    if (forb === actionKind) {
+      decision = "refuse";
+      reason = "You have not allowed me to " + actionKind.replace(/_/g, " ") + ". Nothing will change, and I record the refusal.";
+    } else if (confSel !== "high") {
+      var policy = confSel.replace("low-", "");
+      if (policy === "refuse") { decision = "refuse"; reason = "I can't read this reliably, so I won't act on it."; }
+      else if (policy === "escalate") { decision = "escalate"; reason = "I can't read this reliably; I'll ask your trusted contact to help."; }
+      else { decision = "confirm"; reason = "I'm not certain I read this correctly — please confirm."; }
+    } else if (cur !== "EUR") {
+      decision = "confirm";
+      reason = "This amount is in " + cur + " but your limits are in EUR, so I need you to confirm it.";
+    } else if (amt >= conf || amt > auto) {
+      decision = "confirm";
+      reason = "This is above the amount I can act on without asking.";
+    }
+
+    verdict.className = "verdict verdict--" + decision;
+    vk.textContent = decision;
+    vreason.textContent = reason;
+  }
+  [autoAct, confirmAbove, amount, currency, confidence, forbidden].forEach(function (el) {
+    el.addEventListener("input", function () { syncLabels(); evaluate(); });
+    el.addEventListener("change", function () { syncLabels(); evaluate(); });
+  });
+  document.getElementById("simAction").addEventListener("click", function () {
+    actionKind = "discard_document"; forbidden.value = "discard_document"; syncLabels(); evaluate();
+  });
+  document.getElementById("simAction2").addEventListener("click", function () {
+    actionKind = "make_payment"; forbidden.value = "none"; syncLabels(); evaluate();
+  });
+  syncLabels();
+  evaluate();
+})();
+</script>
+</body>
+</html>
