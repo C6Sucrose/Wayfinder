@@ -111,7 +111,7 @@ Three wire protocols sit behind the chat port — `openai-compatible`, `anthropi
 | `azure` | `openai-compatible` | `gpt-4o-mini` | `AZURE_OPENAI_API_KEY` | Yes |
 | `google` | `openai-compatible` | `gemini-2.0-flash` | `GEMINI_API_KEY` | Yes |
 | `anthropic` | `anthropic-messages` | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` | Yes |
-| `bedrock` | `bedrock-converse` | *(set `WAYFINDER_MODEL`)* | AWS credential chain | Yes |
+| `bedrock` | `bedrock-converse` | *(none; legacy path uses `BEDROCK_MODEL_ID`)* | AWS credential chain | Yes |
 | `deepseek` | `openai-compatible` | `deepseek-chat` | `DEEPSEEK_API_KEY` | No |
 | `qwen` | `openai-compatible` | `qwen-plus` | `DASHSCOPE_API_KEY` | No |
 | `moonshot` | `openai-compatible` | `moonshot-v1-8k` | `MOONSHOT_API_KEY` | No |
@@ -126,7 +126,7 @@ Three wire protocols sit behind the chat port — `openai-compatible`, `anthropi
 | Variable | Default | Purpose |
 |---|---|---|
 | `WAYFINDER_PROVIDER` | `rules` | Provider id from the table above; `rules` needs no key |
-| `WAYFINDER_MODEL` | provider default | Model id sent to the provider; required for `bedrock` and `custom`, defaults per provider otherwise |
+| `WAYFINDER_MODEL` | provider default | Defaults per provider. Required for `custom`; used for the selected chat provider when set. The Bedrock path is configured separately via `BEDROCK_MODEL_ID`. |
 | `WAYFINDER_BASE_URL` | provider default | Endpoint override; required for `custom`, and point Azure at your deployment |
 | `WAYFINDER_API_KEY` | provider key env | Explicit key override; otherwise the provider's key env is used |
 | `WAYFINDER_MAX_ROUNDS` | `4` | Tool-call rounds per utterance before the brain stops |
@@ -152,7 +152,7 @@ AWS_REGION=us-east-1
 ### Honest limitations
 
 - **Provider vision is not shipped.** `WAYFINDER_VISION=provider` is not implemented in this release — it does not enable provider vision. Use `WAYFINDER_VISION=textract`.
-- **Bedrock is gated.** The Bedrock adapter is complete and selectable, but it is currently gated by AWS account verification; `WAYFINDER_PROVIDER=bedrock` switches it on once your account is enabled.
+- **Bedrock is not wired as a chat provider.** The `bedrock` preset is listed but not wired as a `ChatProvider` in this release, and the Bedrock path remains gated by AWS account verification. Setting `BEDROCK_MODEL_ID` still enables the Bedrock brain and extractor when no chat provider is active.
 - **The `anthropic` preset is not wired.** The preset is listed but not wired in this release; use `openrouter` for native Anthropic models.
 - **Meta models have no first-party API.** They are served by `groq`, `together`, and `openrouter`.
 - **Azure needs a deployment URL.** Set `WAYFINDER_BASE_URL` to your Azure OpenAI deployment; the provider has no usable default.
