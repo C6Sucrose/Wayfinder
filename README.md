@@ -96,7 +96,7 @@ A full three-minute walkthrough, including the offline fallback narration, is in
 | `BEDROCK_MODEL_ID` | *(unset)* | Enables the Amazon Bedrock brain and image reader |
 | `AWS_REGION` | `us-east-1` | Region for Textract and Bedrock |
 
-With no chat provider configured, the server uses a deterministic **rule brain** that routes each utterance to one tool call, and the reader reports itself unavailable. Everything else — correlation, authority, the ledger, and every screen — works offline.
+By default, with no chat provider and no `BEDROCK_MODEL_ID` configured, the server uses a deterministic **rule brain** that routes each utterance to one tool call, and the reader reports itself unavailable. Everything else — correlation, authority, the ledger, and every screen — works offline.
 
 ## Choosing a model
 
@@ -126,7 +126,7 @@ Three wire protocols sit behind the chat port — `openai-compatible`, `anthropi
 | Variable | Default | Purpose |
 |---|---|---|
 | `WAYFINDER_PROVIDER` | `rules` | Provider id from the table above; `rules` needs no key |
-| `WAYFINDER_MODEL` | provider default | Model id sent to the provider; required for `custom` (and for selectable `bedrock`) |
+| `WAYFINDER_MODEL` | provider default | Model id sent to the provider; required for `bedrock` and `custom`, defaults per provider otherwise |
 | `WAYFINDER_BASE_URL` | provider default | Endpoint override; required for `custom`, and point Azure at your deployment |
 | `WAYFINDER_API_KEY` | provider key env | Explicit key override; otherwise the provider's key env is used |
 | `WAYFINDER_MAX_ROUNDS` | `4` | Tool-call rounds per utterance before the brain stops |
@@ -151,15 +151,15 @@ AWS_REGION=us-east-1
 
 ### Honest limitations
 
-- **Provider vision is not shipped.** `WAYFINDER_VISION=provider` is not implemented in this release — it warns and leaves vision off. Use `WAYFINDER_VISION=textract`.
+- **Provider vision is not shipped.** `WAYFINDER_VISION=provider` is not implemented in this release — it does not enable provider vision. Use `WAYFINDER_VISION=textract`.
 - **Bedrock is gated.** The Bedrock adapter is complete and selectable, but it is currently gated by AWS account verification; `WAYFINDER_PROVIDER=bedrock` switches it on once your account is enabled.
-- **Anthropic is reachable through `openrouter`.** Use `WAYFINDER_PROVIDER=openrouter` with an Anthropic model id there.
+- **The `anthropic` preset is not wired.** The preset is listed but not wired in this release; use `openrouter` for native Anthropic models.
 - **Meta models have no first-party API.** They are served by `groq`, `together`, and `openrouter`.
 - **Azure needs a deployment URL.** Set `WAYFINDER_BASE_URL` to your Azure OpenAI deployment; the provider has no usable default.
 
 ### Egress
 
-Choosing a hosted provider sends utterances (and images, for provider vision) to that provider. `rules`, `textract`, and `bedrock` stay within your AWS account and the configured `AWS_REGION`; `rules` itself makes no network calls.
+Choosing a hosted provider sends utterances to that provider. `rules`, `textract`, and `bedrock` stay within your AWS account and the configured `AWS_REGION`; `rules` itself makes no network calls.
 
 ## Using it
 

@@ -17,8 +17,8 @@ the provider table in the README lists every preset and its key env. Vision uses
 `WAYFINDER_VISION=textract` with AWS credentials and `AWS_REGION`; provider vision
 is not implemented in this release.
 
-Without a hosted brain the badge shows `rules` and the fallback lines below apply
-(Section: Fallback).
+With no hosted provider and no `BEDROCK_MODEL_ID` configured, the badge shows
+`rules` and the fallback lines below apply (Section: Fallback).
 
 Setup line (say it first, so the object-memory beat has something to find):
 
