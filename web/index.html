@@ -3,31 +3,91 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Wayfinder — Alexa+ simulation</title>
+    <title>Wayfinder — verifiable agency</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main class="stage">
-      <section class="device" aria-label="Simulated Alexa+ device">
-        <header class="device__bar"><span class="device__title">Wayfinder</span><span id="brain" class="badge" aria-live="polite">rules</span></header>
-        <div id="screen" class="device__screen"></div>
-        <div class="device__controls">
-          <div class="demo-menu" role="group" aria-label="Demo controls">
-            <button type="button" class="chip" data-utterance="read my mail">Read my mail</button>
-            <button type="button" class="chip" data-utterance="what's due today?">What's due today?</button>
-            <button type="button" class="chip" data-utterance="where are my keys?">Where are my keys?</button>
-            <button type="button" id="large-text" class="chip" aria-pressed="false">Large text</button>
-            <button type="button" id="reset" class="chip chip--quiet">Reset</button>
+    <a class="skip" href="#screen">Skip to the device screen</a>
+
+    <header class="appbar">
+      <h1 class="brand"><span class="brand__name">Wayfinder</span><span class="brand__tag">verifiable agency</span></h1>
+      <nav class="tabs" aria-label="Views">
+        <button type="button" class="tab" data-view="today" data-tool="daily_briefing" aria-pressed="true">Today</button>
+        <button type="button" class="tab" data-view="documents" data-tool="list_items" aria-pressed="false">Documents</button>
+        <button type="button" class="tab" data-view="backlog" data-tool="get_backlog" aria-pressed="false">Backlog</button>
+        <button type="button" class="tab" data-view="record" data-tool="verify_ledger" aria-pressed="false">Record</button>
+      </nav>
+      <div class="appbar__tools" role="group" aria-label="Display and sound options">
+        <button type="button" id="theme" class="chip chip--quiet" aria-pressed="false">Dark</button>
+        <button type="button" id="large-text" class="chip chip--quiet" aria-pressed="false">Larger text</button>
+        <button type="button" id="motion" class="chip chip--quiet" aria-pressed="true">Motion</button>
+        <button type="button" id="sound" class="chip chip--quiet" aria-pressed="false">Sound cues</button>
+        <button type="button" id="reset" class="chip chip--quiet">Reset</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="console" aria-label="Voice console">
+        <div class="voice">
+          <div class="orb" id="orb" data-state="idle" aria-hidden="true">
+            <span class="orb__glow"></span>
+            <span class="orb__ring orb__ring--a"></span>
+            <span class="orb__ring orb__ring--b"></span>
+            <span class="orb__ring orb__ring--c"></span>
+            <span class="orb__core"></span>
           </div>
-          <button id="talk" type="button" aria-pressed="false">Hold to talk</button>
-          <form id="type-form"><label class="sr-only" for="utterance">Type a request</label><input id="utterance" autocomplete="off" placeholder="Type a request…" /><button type="submit">Send</button></form>
+          <div class="voice__meta">
+            <p class="voice__state" id="voice-state" role="status" aria-live="polite">Ready — hold to talk or type</p>
+            <p class="voice__heard" id="heard" aria-hidden="true"></p>
+            <div class="gain" aria-hidden="true"><span class="gain__fill" id="gain-fill"></span><span class="gain__peak" id="gain-peak"></span></div>
+            <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline id="spark-line" points="" /></svg>
+          </div>
+        </div>
+
+        <ol class="pipeline" id="pipeline" aria-label="Request pipeline">
+          <li class="pipeline__stage" data-stage="capture" data-status="pending"><span class="pipeline__dot"></span><b>Capture</b><span class="pipeline__hint">read the image</span></li>
+          <li class="pipeline__stage" data-stage="correlate" data-status="pending"><span class="pipeline__dot"></span><b>Correlate</b><span class="pipeline__hint">threads and urgency</span></li>
+          <li class="pipeline__stage" data-stage="authority" data-status="pending"><span class="pipeline__dot"></span><b>Authority</b><span class="pipeline__hint">allow, ask, refuse</span></li>
+          <li class="pipeline__stage" data-stage="record" data-status="pending"><span class="pipeline__dot"></span><b>Record</b><span class="pipeline__hint">hash-chained receipt</span></li>
+        </ol>
+
+        <div class="device">
+          <header class="device__bar">
+            <span class="device__title">Wayfinder</span>
+            <span id="brain" class="badge" aria-live="polite">rules</span>
+          </header>
+          <div id="screen" class="device__screen"></div>
+          <div class="device__controls">
+            <div class="quick" role="group" aria-label="Example requests">
+              <button type="button" class="chip" data-utterance="read my mail">Read my mail</button>
+              <button type="button" class="chip" data-utterance="what's due today?">What's due today?</button>
+              <button type="button" class="chip" data-utterance="where are my keys?">Where are my keys?</button>
+              <button type="button" class="chip" data-utterance="prove it">Prove it</button>
+            </div>
+            <button id="talk" type="button" class="talk" aria-pressed="false">Hold to talk</button>
+            <form id="type-form">
+              <label class="sr-only" for="utterance">Type a request</label>
+              <input id="utterance" autocomplete="off" placeholder="Type a request…" />
+              <button type="submit">Send</button>
+            </form>
+            <p id="status" class="status" role="status" aria-live="polite"></p>
+          </div>
         </div>
       </section>
-      <aside class="panel">
-        <h2>Transcript</h2><ol id="transcript" aria-live="polite"></ol>
-        <h2>Events</h2><pre id="events" aria-live="polite"></pre>
+
+      <aside class="panel" aria-label="Conversation and diagnostics">
+        <h2 id="ticker-heading">Working</h2>
+        <ol id="ticker" class="ticker" aria-labelledby="ticker-heading"></ol>
+        <h2 id="transcript-heading">Conversation</h2>
+        <ol id="transcript" aria-labelledby="transcript-heading" aria-live="polite"></ol>
+        <details class="inspector">
+          <summary>Technical events</summary>
+          <pre id="events" aria-label="Tool calls the agent made"></pre>
+        </details>
+        <p class="hint">Press <kbd>Enter</kbd> in the text box to send; hold the button to talk. Every control works from the keyboard, and animations stop when your system asks for reduced motion.</p>
       </aside>
     </main>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

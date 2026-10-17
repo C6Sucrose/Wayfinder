@@ -1,7 +1,7 @@
-export function pickUiTool(
-  calls: Array<{ name: string }>,
+export function pickUiTool<T extends { name: string }>(
+  calls: T[],
   uiTools: readonly string[]
-): { name: string } | undefined {
+): T | undefined {
   return calls.find((c) => uiTools.includes(c.name));
 }
 

@@ -3,18 +3,24 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { AppBridge, PostMessageTransport, getToolUiResourceUri } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolResultSchema, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { McpUiHostCapabilities } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { pickUiTool, scanIsIncomplete } from "./uiTools.js";
 
 export { pickUiTool };
 
 export interface AppHostCall { name: string; input: Record<string, unknown> }
 
-const HOST_INFO = { name: "wayfinder-sim-host", version: "0.1.0" };
-const HOST_CAPABILITIES: McpUiHostCapabilities = { openLinks: {}, serverTools: {}, logging: {} };
+export interface Appearance {
+  theme: "light" | "dark";
+  textSize: "normal" | "large" | "x-large";
+}
 
-export function createAppHost(deps: { mount: HTMLElement }): {
+const HOST_INFO = { name: "wayfinder-sim-host", version: "0.1.0" };
+const HOST_CAPABILITIES = { openLinks: {}, serverTools: {}, logging: {} };
+
+export function createAppHost(deps: { mount: HTMLElement; appearance?: Appearance }): {
   handleToolCalls(calls: AppHostCall[]): Promise<void>;
+  invoke(name: string, input: Record<string, unknown>): Promise<void>;
+  setAppearance(next: Partial<Appearance>): void;
   reset(): void;
 } {
   const client = new Client(HOST_INFO);
@@ -38,6 +44,8 @@ export function createAppHost(deps: { mount: HTMLElement }): {
   let initialized = false;
   let generation = 0;
   let chain: Promise<void> = Promise.resolve();
+  let appearance: Appearance = deps.appearance ?? { theme: "light", textSize: "normal" };
+  let lastTool: Tool | undefined;
 
   async function listTools(): Promise<Tool[]> {
     await ensure();
@@ -54,7 +62,7 @@ export function createAppHost(deps: { mount: HTMLElement }): {
   }
 
   function discardView(): void {
-    void bridge?.close();
+    void bridge?.teardownResource({});
     bridge = undefined;
     iframe = undefined;
     initialized = false;
@@ -82,6 +90,7 @@ export function createAppHost(deps: { mount: HTMLElement }): {
 
     pendingInput = input;
     pendingResult = result;
+    lastTool = tool;
 
     if (!iframe) {
       const frame = document.createElement("iframe");
@@ -93,7 +102,7 @@ export function createAppHost(deps: { mount: HTMLElement }): {
       if (!frameWindow) return;
 
       const hostBridge = new AppBridge(client, HOST_INFO, HOST_CAPABILITIES, {
-        hostContext: { toolInfo: { tool } }
+        hostContext: { toolInfo: { tool }, ...appearance }
       });
       hostBridge.onsizechange = ({ height }) => {
         if (typeof height === "number") frame.style.height = `${height}px`;
@@ -107,13 +116,13 @@ export function createAppHost(deps: { mount: HTMLElement }): {
       try {
         await hostBridge.connect(new PostMessageTransport(frameWindow, frameWindow));
         if (gen !== generation) {
-          void hostBridge.close();
+          void hostBridge.teardownResource({});
           frame.remove();
           return;
         }
         const read = await client.readResource({ uri });
         if (gen !== generation) {
-          void hostBridge.close();
+          void hostBridge.teardownResource({});
           frame.remove();
           return;
         }
@@ -124,12 +133,12 @@ export function createAppHost(deps: { mount: HTMLElement }): {
       }
 
       if (!html) {
-        void hostBridge.close();
+        void hostBridge.teardownResource({});
         frame.remove();
         return;
       }
       if (gen !== generation) {
-        void hostBridge.close();
+        void hostBridge.teardownResource({});
         frame.remove();
         return;
       }
@@ -142,7 +151,7 @@ export function createAppHost(deps: { mount: HTMLElement }): {
 
     if (gen !== generation) return;
     if (bridge) {
-      bridge.setHostContext({ toolInfo: { tool } });
+      bridge.setHostContext({ toolInfo: { tool }, ...appearance });
       sendPending();
     }
   }
@@ -186,6 +195,24 @@ export function createAppHost(deps: { mount: HTMLElement }): {
       const run = chain.then(() => doHandle(calls, gen));
       chain = run.catch(() => {});
       return run;
+    },
+    invoke(name: string, input: Record<string, unknown>): Promise<void> {
+      const gen = generation;
+      const run = chain.then(async () => {
+        await ensure();
+        if (gen !== generation) return;
+        const result = await callTool(name, input);
+        if (gen !== generation) return;
+        await render(name, input, result, gen);
+      });
+      chain = run.catch(() => {});
+      return run;
+    },
+    setAppearance(next: Partial<Appearance>): void {
+      appearance = { ...appearance, ...next };
+      if (bridge && lastTool) {
+        bridge.setHostContext({ toolInfo: { tool: lastTool }, ...appearance });
+      }
     },
     reset(): void {
       generation += 1;
