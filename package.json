@@ -15,7 +15,7 @@
     "test": "vitest run",
     "pretest": "npm run build:ui",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.test.json && tsc -p ui/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json && tsc -p ui/tsconfig.json && tsc -p web/tsconfig.json",
     "lint": "eslint .",
     "adapters:conformance": "node scripts/adapters-conformance.mjs",
     "verify:bedrock": "node scripts/verify-bedrock.mjs",

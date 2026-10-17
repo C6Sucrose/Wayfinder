@@ -17,7 +17,7 @@ await build({
 <html lang="en">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Wayfinder</title><style>${css}</style></head>
-<body><main id="root" role="main" aria-live="polite"></main><script>${js}</script></body>
+<body><main id="root" role="main"></main><div id="announcer" role="status" aria-live="polite" class="sr-only"></div><script>${js}</script></body>
 </html>`;
   mkdirSync("dist/ui", { recursive: true });
   writeFileSync("dist/ui/app.html", html, "utf8");
