@@ -259,6 +259,7 @@
     <a href="#safety">Safety and privacy</a>
     <a href="#accessibility">Accessibility</a>
     <h4>Extending</h4>
+    <a href="#providers">Model providers</a>
     <a href="#integrations">Optional integrations</a>
     <a href="#reference">MCP reference</a>
     <a href="#develop">Development</a>
@@ -495,6 +496,79 @@ npm start          # MCP server on http://127.0.0.1:8080</code></pre>
         <div class="card"><h3>Large text</h3><p>A toggle that scales the interface, synchronized with <code>aria-pressed</code>.</p></div>
         <div class="card"><h3>Live regions</h3><p>The transcript and brain badge announce changes for screen readers.</p></div>
       </div>
+    </section>
+
+    <section class="block" id="providers" data-title="Model providers" data-keywords="providers model chat port openai azure google gemini anthropic bedrock deepseek qwen moonshot zhipu minimax groq together mistral openrouter custom rules provider config vision textract egress">
+      <p class="kicker">Extending</p>
+      <h2>Bring your own model</h2>
+      <p class="lede">One port, many providers; <code>rules</code> is the default and needs no key.</p>
+      <div class="badges">
+        <span class="chip chip--ok">rules by default, no warnings</span>
+        <span class="chip">openai-compatible</span>
+        <span class="chip">anthropic-messages</span>
+        <span class="chip">bedrock-converse</span>
+      </div>
+      <p>Every preset speaks one of three wire protocols behind the same chat port. Select one with <code>WAYFINDER_PROVIDER</code>; a <code>rules</code> run starts with no warnings.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Provider id</th><th>Protocol</th><th>Default model</th><th>Key env</th><th>Images</th></tr></thead>
+          <tbody>
+            <tr><td><code>rules</code></td><td>—</td><td>—</td><td>—</td><td>No</td></tr>
+            <tr><td><code>openai</code></td><td><code>openai-compatible</code></td><td><code>gpt-4o-mini</code></td><td><code>OPENAI_API_KEY</code></td><td>Yes</td></tr>
+            <tr><td><code>azure</code></td><td><code>openai-compatible</code></td><td><code>gpt-4o-mini</code></td><td><code>AZURE_OPENAI_API_KEY</code></td><td>Yes</td></tr>
+            <tr><td><code>google</code></td><td><code>openai-compatible</code></td><td><code>gemini-2.0-flash</code></td><td><code>GEMINI_API_KEY</code></td><td>Yes</td></tr>
+            <tr><td><code>anthropic</code></td><td><code>anthropic-messages</code></td><td><code>claude-sonnet-4-5</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Yes</td></tr>
+            <tr><td><code>bedrock</code></td><td><code>bedrock-converse</code></td><td><em>set <code>WAYFINDER_MODEL</code></em></td><td>AWS credential chain</td><td>Yes</td></tr>
+            <tr><td><code>deepseek</code></td><td><code>openai-compatible</code></td><td><code>deepseek-chat</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>qwen</code></td><td><code>openai-compatible</code></td><td><code>qwen-plus</code></td><td><code>DASHSCOPE_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>moonshot</code></td><td><code>openai-compatible</code></td><td><code>moonshot-v1-8k</code></td><td><code>MOONSHOT_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>zhipu</code></td><td><code>openai-compatible</code></td><td><code>glm-4-flash</code></td><td><code>ZHIPU_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>minimax</code></td><td><code>openai-compatible</code></td><td><code>abab6.5s-chat</code></td><td><code>MINIMAX_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>groq</code></td><td><code>openai-compatible</code></td><td><code>llama-3.3-70b-versatile</code></td><td><code>GROQ_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>together</code></td><td><code>openai-compatible</code></td><td><code>meta-llama/Llama-3.3-70B-Instruct-Turbo</code></td><td><code>TOGETHER_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>mistral</code></td><td><code>openai-compatible</code></td><td><code>mistral-large-latest</code></td><td><code>MISTRAL_API_KEY</code></td><td>No</td></tr>
+            <tr><td><code>openrouter</code></td><td><code>openai-compatible</code></td><td><code>openai/gpt-4o-mini</code></td><td><code>OPENROUTER_API_KEY</code></td><td>Yes</td></tr>
+            <tr><td><code>custom</code></td><td><code>openai-compatible</code></td><td><em>set <code>WAYFINDER_MODEL</code></em></td><td><code>WAYFINDER_API_KEY</code></td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Configuration</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>WAYFINDER_PROVIDER</code></td><td><code>rules</code></td><td>Provider id from the table above; <code>rules</code> needs no key</td></tr>
+            <tr><td><code>WAYFINDER_MODEL</code></td><td>provider default</td><td>Model id sent to the provider; required for <code>custom</code> (and for selectable <code>bedrock</code>)</td></tr>
+            <tr><td><code>WAYFINDER_BASE_URL</code></td><td>provider default</td><td>Endpoint override; required for <code>custom</code>, and point Azure at your deployment</td></tr>
+            <tr><td><code>WAYFINDER_API_KEY</code></td><td>provider key env</td><td>Explicit key override; otherwise the provider's key env is used</td></tr>
+            <tr><td><code>WAYFINDER_MAX_ROUNDS</code></td><td><code>4</code></td><td>Tool-call rounds per utterance before the brain stops</td></tr>
+            <tr><td><code>WAYFINDER_VISION</code></td><td><code>none</code></td><td><code>none</code>, <code>textract</code>, or <code>bedrock</code>; <code>provider</code> is not implemented in this release</td></tr>
+            <tr><td><code>WAYFINDER_TIMEOUT_MS</code></td><td><code>15000</code></td><td>Per-request provider timeout in milliseconds</td></tr>
+            <tr><td><code>AWS_REGION</code></td><td><code>us-east-1</code></td><td>Region for Textract and Bedrock</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Examples</h3>
+      <p>A hosted brain, for example Google:</p>
+      <pre><code>WAYFINDER_PROVIDER=google
+GEMINI_API_KEY=...
+WAYFINDER_MODEL=gemini-2.0-flash</code></pre>
+      <p>Document vision through Amazon Textract:</p>
+      <pre><code>WAYFINDER_VISION=textract
+AWS_REGION=us-east-1</code></pre>
+      <h3>Honest limitations</h3>
+      <div class="callout callout--warn">
+        <p><strong>What this release does not do.</strong></p>
+        <ul>
+          <li><strong>Provider vision is not shipped.</strong> <code>WAYFINDER_VISION=provider</code> is not implemented in this release — it warns and leaves vision off. Use <code>WAYFINDER_VISION=textract</code>.</li>
+          <li><strong>Bedrock is gated.</strong> The Bedrock adapter is complete and selectable, but it is currently gated by AWS account verification; <code>WAYFINDER_PROVIDER=bedrock</code> switches it on once your account is enabled.</li>
+          <li><strong>Anthropic is reachable through <code>openrouter</code>.</strong> Use <code>WAYFINDER_PROVIDER=openrouter</code> with an Anthropic model id there.</li>
+          <li><strong>Meta models have no first-party API.</strong> They are served by <code>groq</code>, <code>together</code>, and <code>openrouter</code>.</li>
+          <li><strong>Azure needs a deployment URL.</strong> Set <code>WAYFINDER_BASE_URL</code> to your Azure OpenAI deployment; the provider has no usable default.</li>
+        </ul>
+      </div>
+      <h3>Egress</h3>
+      <p>Choosing a hosted provider sends utterances (and images, for provider vision) to that provider. <code>rules</code>, <code>textract</code>, and <code>bedrock</code> stay within your AWS account and the configured <code>AWS_REGION</code>; <code>rules</code> itself makes no network calls.</p>
     </section>
 
     <section class="block" id="integrations" data-title="Optional integrations" data-keywords="adapters ports null notifier webhook calendar ics payment epc signature document source assist disabled by default conformance">

@@ -10,9 +10,15 @@ to say, and what appears on the device screen.
 2. Terminal A: `npm run build` then `npm start` (server on `http://127.0.0.1:8080`)
 3. Terminal B: `npm run dev:web` then open `http://127.0.0.1:5173`
 
-Optional (better narration): set `BEDROCK_MODEL_ID` and `AWS_REGION` before
-`npm start` to enable the Bedrock brain and image reader. Without them the brain
-badge shows `rules` and the fallback lines below apply (Section: Fallback).
+The rule brain needs nothing: it is the default and produces no warnings. To use a
+hosted brain, set `WAYFINDER_PROVIDER` (for example `google`) plus that provider's
+key env (for example `GEMINI_API_KEY`) and `WAYFINDER_MODEL` before `npm start`;
+the provider table in the README lists every preset and its key env. Vision uses
+`WAYFINDER_VISION=textract` with AWS credentials and `AWS_REGION`; provider vision
+is not implemented in this release.
+
+Without a hosted brain the badge shows `rules` and the fallback lines below apply
+(Section: Fallback).
 
 Setup line (say it first, so the object-memory beat has something to find):
 
@@ -29,17 +35,17 @@ Say:
 
 - Screen: the device screen fills with the results card grid from `get_scan`:
   one card per mail item, showing its class and due date when present.
-- This is the Bedrock path (`brain: bedrock`): the brain calls `capture_scan`
-  and then `get_scan`, which is the tool that carries
+- This is the hosted-brain path (the captured run used Bedrock: `brain: bedrock`):
+  the brain calls `capture_scan` and then `get_scan`, which is the tool that carries
   `_meta.ui.resourceUri`, so the host mounts the View.
-- Not captured for this script: the exact Bedrock reply/tool sequence needs AWS.
-  With the reader configured the spoken line is the server's `get_scan` summary,
-  e.g. "I read N item(s)."
+- Not captured for this script: the exact hosted-brain reply/tool sequence depends
+  on the configured provider. With document vision configured the spoken line is
+  the server's `get_scan` summary, e.g. "I read N item(s)."
 
-### Fallback when Bedrock is unavailable (`brain: rules`)
+### Fallback when no hosted brain is configured (`brain: rules`)
 
-The rule brain routes "read my mail" straight to `capture_scan`, and the reader
-is not configured, so no cards appear. Captured exactly:
+The rule brain routes "read my mail" straight to `capture_scan`, and vision is not
+configured, so no cards appear. Captured exactly:
 
 - `brain: rules`
 - `reply: "I can't read photos on this device yet — that part isn't set up."`
@@ -47,8 +53,8 @@ is not configured, so no cards appear. Captured exactly:
 - Screen: unchanged (no `get_scan` call, so no UI-resource tool runs).
 
 Narrate: "In this offline configuration the reader isn't set up, so there are no
-cards yet. With the Amazon Bedrock reader enabled, this is where the mail cards
-appear."
+cards yet. With document vision enabled through Amazon Textract, this is where the
+mail cards appear."
 
 ## Beat 2 (1:10–1:50) — "what's due today?" → briefing
 
@@ -88,7 +94,7 @@ If the setup line was skipped, the captured reply is
   `ui://wayfinder/app.html` resource and rendered in a sandboxed iframe through
   the MCP Apps `AppBridge`, so the same view works in any MCP Apps host.
 
-## Fallback narration when Bedrock is unavailable
+## Fallback narration when no hosted brain is configured
 
 The brain badge reads `rules`. The server is fully runnable with no AWS account;
 the rule-based brain routes each utterance to one tool call.
@@ -96,9 +102,9 @@ the rule-based brain routes each utterance to one tool call.
 Say:
 
 > "This demo is running the offline rule brain — the badge says 'rules'. It routes
-> your request to the right tool and speaks the tool's answer. With Amazon Bedrock
-> configured, the same tools get a natural-language brain and an image reader, and
-> the mail cards in beat one come from actually reading the photos."
+> your request to the right tool and speaks the tool's answer. With a hosted provider
+> configured, the same tools get a natural-language brain, and Textract can read the
+> photos behind the mail cards in beat one."
 
 Captured fallback lines (reproduced above, in order):
 
