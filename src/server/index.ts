@@ -32,7 +32,7 @@ const adapters = createAdapters(adapterConfig);
 for (const warning of adapterConfig.warnings) console.warn(`[wayfinder] adapter: ${warning}`);
 const notify = createConfiguredNotifyQueue(adapterConfig, { notifier: adapters.notifier, store });
 const modelId = process.env.BEDROCK_MODEL_ID;
-const bedrock = modelId ? new BedrockRuntimeClient({ region: process.env.AWS_REGION ?? "eu-central-1" }) : undefined;
+const bedrock = modelId ? new BedrockRuntimeClient({ region: process.env.AWS_REGION ?? "us-east-1" }) : undefined;
 const converse = bedrock
   ? { send: (input: unknown) => bedrock.send(new ConverseCommand(input as never)) }
   : undefined;
