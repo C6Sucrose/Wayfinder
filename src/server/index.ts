@@ -7,7 +7,8 @@ import { createTextractExtractor } from "../scan/textractExtractor.js";
 import { createMcpExecutor, type McpClientLike } from "../agent/mcpExecutor.js";
 import { createAgentService } from "../agent/service.js";
 import { createOpenAICompatProvider } from "../providers/openaiCompat.js";
-import { resolveProviderConfig, resolveVision } from "../providers/config.js";
+import { resolveProviderConfig } from "../providers/config.js";
+import { resolveWiring } from "../providers/wiring.js";
 import type { ChatProvider } from "../providers/types.js";
 import type { ProviderSummary } from "../adapters/capabilities.js";
 import { scanCompleteMessage } from "../domain/scans.js";
@@ -36,45 +37,44 @@ const bedrock = modelId ? new BedrockRuntimeClient({ region: process.env.AWS_REG
 const converse = bedrock
   ? { send: (input: unknown) => bedrock.send(new ConverseCommand(input as never)) }
   : undefined;
-const bedrockExtract = modelId && converse ? createBedrockExtractor({ client: converse, modelId, allowedRoot: captureRoot }) : undefined;
-
+const wiring = resolveWiring(process.env, { bedrockConfigured: Boolean(modelId) });
+for (const warning of wiring.providerWarnings) console.warn(`[wayfinder] provider: ${warning}`);
+for (const warning of wiring.visionWarnings) console.warn(`[wayfinder] vision: ${warning}`);
 const providerConfig = resolveProviderConfig(process.env);
-for (const warning of providerConfig.warnings) console.warn(`[wayfinder] provider: ${warning}`);
-const vision = resolveVision(process.env, providerConfig.provider);
-for (const warning of vision.warnings) console.warn(`[wayfinder] vision: ${warning}`);
 const chosen = providerConfig.provider;
+const bedrockExtract = wiring.vision === "bedrock" && converse !== undefined && modelId !== undefined
+  ? createBedrockExtractor({ client: converse, modelId, allowedRoot: captureRoot })
+  : undefined;
 
 let brainProvider: ChatProvider | undefined;
 let brainModel: string | undefined;
 let brainMaxRounds: number | undefined;
-if (chosen.kind === "chat") {
+if (wiring.brain === "provider" && chosen.kind === "chat") {
   brainModel = chosen.model;
   brainMaxRounds = chosen.maxRounds;
-  if (chosen.protocol === "openai-compatible") {
-    brainProvider = createOpenAICompatProvider({
-      id: chosen.id,
-      baseUrl: chosen.baseUrl,
-      apiKey: chosen.apiKey,
-      model: chosen.model,
-      supportsImages: chosen.supportsImages,
-      timeoutMs: chosen.timeoutMs,
-      ...(chosen.authHeader !== undefined ? { authHeader: chosen.authHeader } : {}),
-      ...(chosen.query !== undefined ? { query: chosen.query } : {})
-    });
-  } else {
-    console.warn(`[wayfinder] provider: ${chosen.protocol} is not wired yet; using rules`);
-  }
+  brainProvider = createOpenAICompatProvider({
+    id: chosen.id,
+    baseUrl: chosen.baseUrl,
+    apiKey: chosen.apiKey,
+    model: chosen.model,
+    supportsImages: chosen.supportsImages,
+    timeoutMs: chosen.timeoutMs,
+    ...(chosen.authHeader !== undefined ? { authHeader: chosen.authHeader } : {}),
+    ...(chosen.query !== undefined ? { query: chosen.query } : {})
+  });
 }
 
-const extract = vision.kind === "textract"
+const extract = wiring.vision === "textract"
   ? createTextractExtractor({
       client: createTextractClient(process.env.AWS_REGION ?? "us-east-1"),
       allowedRoot: captureRoot
     })
-  : bedrockExtract;
+  : wiring.vision === "bedrock"
+    ? bedrockExtract
+    : undefined;
 
-const useBedrockBrain = brainProvider === undefined && chosen.kind === "rules" && converse !== undefined && Boolean(modelId);
-const activeVision = extract === undefined ? "none" : vision.kind === "textract" ? "textract" : "bedrock";
+const useBedrockBrain = wiring.brain === "bedrock";
+const activeVision = extract === undefined ? "none" : wiring.vision;
 const providers: ProviderSummary = {
   brain: brainProvider !== undefined
     ? {
