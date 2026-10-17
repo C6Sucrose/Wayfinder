@@ -27,30 +27,40 @@ function positiveInt(value: string | undefined, fallback: number): number {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+const nonEmpty = (v: string | undefined): string | undefined => (v !== undefined && v.trim() !== "" ? v.trim() : undefined);
+
 export function resolveProviderConfig(env: NodeJS.ProcessEnv): ProviderResolution {
   const warnings: string[] = [];
-  const id = (env.WAYFINDER_PROVIDER ?? "rules").trim() as ProviderId;
+  const id = (nonEmpty(env.WAYFINDER_PROVIDER) ?? "rules") as ProviderId;
   if (id === "rules") return { provider: { kind: "rules" }, warnings };
 
-  const preset = PRESETS[id as Exclude<ProviderId, "rules">];
-  if (!preset) {
+  if (!Object.hasOwn(PRESETS, id)) {
     warnings.push(`unknown provider "${id}"; using rules`);
     return { provider: { kind: "rules" }, warnings };
   }
 
-  const baseUrl = (env.WAYFINDER_BASE_URL ?? preset.baseUrl).trim();
-  if (preset.id === "custom" && !baseUrl) {
-    warnings.push("custom provider requires WAYFINDER_BASE_URL; using rules");
-    return { provider: { kind: "rules" }, warnings };
+  const preset = PRESETS[id as Exclude<ProviderId, "rules">];
+  const baseUrl = nonEmpty(env.WAYFINDER_BASE_URL) ?? nonEmpty(preset.baseUrl) ?? "";
+  if (preset.protocol === "openai-compatible") {
+    if (!baseUrl) {
+      warnings.push(`${id} requires WAYFINDER_BASE_URL; using rules`);
+      return { provider: { kind: "rules" }, warnings };
+    }
+    try {
+      new URL(baseUrl);
+    } catch {
+      warnings.push(`${id} has an invalid WAYFINDER_BASE_URL; using rules`);
+      return { provider: { kind: "rules" }, warnings };
+    }
   }
 
-  const model = (env.WAYFINDER_MODEL ?? preset.defaultModel).trim();
+  const model = nonEmpty(env.WAYFINDER_MODEL) ?? nonEmpty(preset.defaultModel) ?? "";
   if (!model && preset.id !== "bedrock") {
     warnings.push(`${id} needs WAYFINDER_MODEL; using rules`);
     return { provider: { kind: "rules" }, warnings };
   }
 
-  const apiKey = (env.WAYFINDER_API_KEY ?? (preset.apiKeyEnv ? env[preset.apiKeyEnv] : undefined) ?? "").trim();
+  const apiKey = nonEmpty(env.WAYFINDER_API_KEY) ?? (preset.apiKeyEnv ? nonEmpty(env[preset.apiKeyEnv]) : undefined) ?? "";
   if (preset.id !== "bedrock" && !apiKey) {
     warnings.push(`${id} has no API key (${preset.apiKeyEnv || "WAYFINDER_API_KEY"}); using rules`);
     return { provider: { kind: "rules" }, warnings };

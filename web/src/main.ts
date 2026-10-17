@@ -291,6 +291,7 @@ if (SpeechRecognitionCtor) {
   recognition.lang = "en-US";
   recognition.interimResults = true;
   recognition.continuous = false;
+  let sentFinal = false;
   recognition.onresult = (e) => {
     let final = "";
     let interim = "";
@@ -300,8 +301,15 @@ if (SpeechRecognitionCtor) {
       if (result.length > 1 || (result as unknown as { isFinal?: boolean }).isFinal) final += text;
       else interim += text;
     }
-    heard.textContent = final || interim;
-    if (final.trim()) void send(final.trim());
+    const finalText = final.trim();
+    if (finalText && !sentFinal) {
+      sentFinal = true;
+      heard.textContent = finalText;
+      void send(finalText);
+      heard.textContent = "";
+    } else {
+      heard.textContent = final || interim;
+    }
   };
   let listening = false;
   const resetTalk = (): void => {
@@ -315,6 +323,7 @@ if (SpeechRecognitionCtor) {
   const start = (): void => {
     if (listening) return;
     listening = true;
+    sentFinal = false;
     talk.setAttribute("aria-pressed", "true");
     heard.textContent = "";
     setStatus("Listening…");
@@ -329,14 +338,17 @@ if (SpeechRecognitionCtor) {
   };
   const stop = (): void => {
     if (!listening) return;
-    const heardNow = heard.textContent ?? "";
+    const heardNow = (heard.textContent ?? "").trim();
     resetTalk();
     try {
       recognition.stop();
     } catch {
       resetTalk();
     }
-    if (heardNow.trim()) void send(heardNow.trim());
+    if (heardNow && !sentFinal) {
+      heard.textContent = "";
+      void send(heardNow);
+    }
   };
   talk.addEventListener("pointerdown", start);
   talk.addEventListener("pointerup", stop);

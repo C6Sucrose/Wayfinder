@@ -40,8 +40,42 @@ describe("resolveProviderConfig", () => {
     expect(r.warnings.join(" ")).toContain("unknown provider");
   });
 
+  it("does not resolve inherited prototype members", () => {
+    const r = resolveProviderConfig({ WAYFINDER_PROVIDER: "constructor" });
+    expect(r.provider).toEqual({ kind: "rules" });
+    expect(r.warnings.join(" ")).toContain("unknown provider");
+  });
+
+  it("does not resolve __proto__", () => {
+    const r = resolveProviderConfig({ WAYFINDER_PROVIDER: "__proto__" });
+    expect(r.provider).toEqual({ kind: "rules" });
+    expect(r.warnings.join(" ")).toContain("unknown provider");
+  });
+
+  it("ignores an empty WAYFINDER_API_KEY and uses the preset key env", () => {
+    const r = resolveProviderConfig({ WAYFINDER_PROVIDER: "openai", WAYFINDER_API_KEY: "", OPENAI_API_KEY: "real" });
+    expect(r.provider).toMatchObject({ kind: "chat", apiKey: "real", apiKeyFound: true });
+  });
+
+  it("requires a base URL for azure", () => {
+    const r = resolveProviderConfig({ WAYFINDER_PROVIDER: "azure", AZURE_OPENAI_API_KEY: "k" });
+    expect(r.provider).toEqual({ kind: "rules" });
+    expect(r.warnings.join(" ")).toContain("WAYFINDER_BASE_URL");
+  });
+
   it("requires a base URL for custom", () => {
     const r = resolveProviderConfig({ WAYFINDER_PROVIDER: "custom", WAYFINDER_API_KEY: "k" });
+    expect(r.provider).toEqual({ kind: "rules" });
+    expect(r.warnings.join(" ")).toContain("WAYFINDER_BASE_URL");
+  });
+
+  it("rejects an unparseable base URL", () => {
+    const r = resolveProviderConfig({
+      WAYFINDER_PROVIDER: "custom",
+      WAYFINDER_MODEL: "m",
+      WAYFINDER_API_KEY: "k",
+      WAYFINDER_BASE_URL: "not a url"
+    });
     expect(r.provider).toEqual({ kind: "rules" });
     expect(r.warnings.join(" ")).toContain("WAYFINDER_BASE_URL");
   });
