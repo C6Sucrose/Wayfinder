@@ -37,6 +37,24 @@ describe("resolveWiring", () => {
     expect(r.brain).toBe("bedrock");
   });
 
+  it("does not route an unwired chat provider to Bedrock when Bedrock is configured", () => {
+    const r = resolveWiring(
+      { WAYFINDER_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "k" },
+      { bedrockConfigured: true }
+    );
+    expect(r.brain).toBe("rules");
+    expect(r.providerWarnings.join(" ")).toContain("not wired yet");
+  });
+
+  it("does not route an unwired chat provider to Bedrock when Bedrock is not configured", () => {
+    const r = resolveWiring(
+      { WAYFINDER_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "k" },
+      { bedrockConfigured: false }
+    );
+    expect(r.brain).toBe("rules");
+    expect(r.providerWarnings.join(" ")).toContain("not wired yet");
+  });
+
   it("keeps vision off for an explicit WAYFINDER_VISION=none", () => {
     const r = resolveWiring({ WAYFINDER_VISION: "none" }, { bedrockConfigured: true });
     expect(r.vision).toBe("none");
