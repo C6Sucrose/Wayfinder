@@ -538,7 +538,7 @@ npm start          # MCP server on http://127.0.0.1:8080</code></pre>
           <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
           <tbody>
             <tr><td><code>WAYFINDER_PROVIDER</code></td><td><code>rules</code></td><td>Provider id from the table above; <code>rules</code> needs no key</td></tr>
-            <tr><td><code>WAYFINDER_MODEL</code></td><td>provider default</td><td>Model id sent to the provider; required for <code>custom</code> (and for selectable <code>bedrock</code>)</td></tr>
+            <tr><td><code>WAYFINDER_MODEL</code></td><td>provider default</td><td>Model id sent to the provider; required for <code>bedrock</code> and <code>custom</code>, defaults per provider otherwise</td></tr>
             <tr><td><code>WAYFINDER_BASE_URL</code></td><td>provider default</td><td>Endpoint override; required for <code>custom</code>, and point Azure at your deployment</td></tr>
             <tr><td><code>WAYFINDER_API_KEY</code></td><td>provider key env</td><td>Explicit key override; otherwise the provider's key env is used</td></tr>
             <tr><td><code>WAYFINDER_MAX_ROUNDS</code></td><td><code>4</code></td><td>Tool-call rounds per utterance before the brain stops</td></tr>
@@ -560,15 +560,15 @@ AWS_REGION=us-east-1</code></pre>
       <div class="callout callout--warn">
         <p><strong>What this release does not do.</strong></p>
         <ul>
-          <li><strong>Provider vision is not shipped.</strong> <code>WAYFINDER_VISION=provider</code> is not implemented in this release — it warns and leaves vision off. Use <code>WAYFINDER_VISION=textract</code>.</li>
+          <li><strong>Provider vision is not shipped.</strong> <code>WAYFINDER_VISION=provider</code> is not implemented in this release — it does not enable provider vision. Use <code>WAYFINDER_VISION=textract</code>.</li>
           <li><strong>Bedrock is gated.</strong> The Bedrock adapter is complete and selectable, but it is currently gated by AWS account verification; <code>WAYFINDER_PROVIDER=bedrock</code> switches it on once your account is enabled.</li>
-          <li><strong>Anthropic is reachable through <code>openrouter</code>.</strong> Use <code>WAYFINDER_PROVIDER=openrouter</code> with an Anthropic model id there.</li>
+          <li><strong>The <code>anthropic</code> preset is not wired.</strong> The preset is listed but not wired in this release; use <code>openrouter</code> for native Anthropic models.</li>
           <li><strong>Meta models have no first-party API.</strong> They are served by <code>groq</code>, <code>together</code>, and <code>openrouter</code>.</li>
           <li><strong>Azure needs a deployment URL.</strong> Set <code>WAYFINDER_BASE_URL</code> to your Azure OpenAI deployment; the provider has no usable default.</li>
         </ul>
       </div>
       <h3>Egress</h3>
-      <p>Choosing a hosted provider sends utterances (and images, for provider vision) to that provider. <code>rules</code>, <code>textract</code>, and <code>bedrock</code> stay within your AWS account and the configured <code>AWS_REGION</code>; <code>rules</code> itself makes no network calls.</p>
+      <p>Choosing a hosted provider sends utterances to that provider. <code>rules</code>, <code>textract</code>, and <code>bedrock</code> stay within your AWS account and the configured <code>AWS_REGION</code>; <code>rules</code> itself makes no network calls.</p>
     </section>
 
     <section class="block" id="integrations" data-title="Optional integrations" data-keywords="adapters ports null notifier webhook calendar ics payment epc signature document source assist disabled by default conformance">
