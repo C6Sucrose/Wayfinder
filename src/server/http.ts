@@ -9,7 +9,7 @@ import type { ScanWorker } from "../scan/worker.js";
 import type { AgentService } from "../agent/service.js";
 import { buildServer } from "../mcp/server.js";
 import { copy } from "../domain/copy.js";
-import { buildCapabilities, readChain } from "../adapters/capabilities.js";
+import { buildCapabilities, readChain, type ProviderSummary } from "../adapters/capabilities.js";
 import type { AdapterConfig } from "../adapters/config.js";
 import type { AdapterBundle } from "../adapters/types.js";
 import type { NotifyQueue } from "../adapters/notifyQueue.js";
@@ -36,6 +36,7 @@ export interface HttpDeps {
   adapters?: AdapterBundle;
   adapterConfig?: AdapterConfig;
   notify?: NotifyQueue;
+  providers?: ProviderSummary;
 }
 
 export function createHttpApp(deps: HttpDeps) {
@@ -68,7 +69,11 @@ export function createHttpApp(deps: HttpDeps) {
 
   app.get("/capabilities", async (_req, res) => {
     try {
-      const capabilities = buildCapabilities(deps.adapterConfig ?? fallbackConfig, await readChain(deps.store));
+      const config = deps.adapterConfig ?? fallbackConfig;
+      const chain = await readChain(deps.store);
+      const capabilities = deps.providers !== undefined
+        ? buildCapabilities(config, chain, deps.providers)
+        : buildCapabilities(config, chain);
       res.json(capabilities);
     } catch (err) {
       console.error("[capabilities] failed:", err);
