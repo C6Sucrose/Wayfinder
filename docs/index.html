@@ -518,7 +518,7 @@ npm start          # MCP server on http://127.0.0.1:8080</code></pre>
             <tr><td><code>azure</code></td><td><code>openai-compatible</code></td><td><code>gpt-4o-mini</code></td><td><code>AZURE_OPENAI_API_KEY</code></td><td>Yes</td></tr>
             <tr><td><code>google</code></td><td><code>openai-compatible</code></td><td><code>gemini-2.0-flash</code></td><td><code>GEMINI_API_KEY</code></td><td>Yes</td></tr>
             <tr><td><code>anthropic</code></td><td><code>anthropic-messages</code></td><td><code>claude-sonnet-4-5</code></td><td><code>ANTHROPIC_API_KEY</code></td><td>Yes</td></tr>
-            <tr><td><code>bedrock</code></td><td><code>bedrock-converse</code></td><td><em>set <code>WAYFINDER_MODEL</code></em></td><td>AWS credential chain</td><td>Yes</td></tr>
+            <tr><td><code>bedrock</code></td><td><code>bedrock-converse</code></td><td><em>none; legacy path uses <code>BEDROCK_MODEL_ID</code></em></td><td>AWS credential chain</td><td>Yes</td></tr>
             <tr><td><code>deepseek</code></td><td><code>openai-compatible</code></td><td><code>deepseek-chat</code></td><td><code>DEEPSEEK_API_KEY</code></td><td>No</td></tr>
             <tr><td><code>qwen</code></td><td><code>openai-compatible</code></td><td><code>qwen-plus</code></td><td><code>DASHSCOPE_API_KEY</code></td><td>No</td></tr>
             <tr><td><code>moonshot</code></td><td><code>openai-compatible</code></td><td><code>moonshot-v1-8k</code></td><td><code>MOONSHOT_API_KEY</code></td><td>No</td></tr>
@@ -538,7 +538,7 @@ npm start          # MCP server on http://127.0.0.1:8080</code></pre>
           <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
           <tbody>
             <tr><td><code>WAYFINDER_PROVIDER</code></td><td><code>rules</code></td><td>Provider id from the table above; <code>rules</code> needs no key</td></tr>
-            <tr><td><code>WAYFINDER_MODEL</code></td><td>provider default</td><td>Model id sent to the provider; required for <code>bedrock</code> and <code>custom</code>, defaults per provider otherwise</td></tr>
+            <tr><td><code>WAYFINDER_MODEL</code></td><td>provider default</td><td>Defaults per provider. Required for <code>custom</code>; used for the selected chat provider when set. The Bedrock path is configured separately via <code>BEDROCK_MODEL_ID</code>.</td></tr>
             <tr><td><code>WAYFINDER_BASE_URL</code></td><td>provider default</td><td>Endpoint override; required for <code>custom</code>, and point Azure at your deployment</td></tr>
             <tr><td><code>WAYFINDER_API_KEY</code></td><td>provider key env</td><td>Explicit key override; otherwise the provider's key env is used</td></tr>
             <tr><td><code>WAYFINDER_MAX_ROUNDS</code></td><td><code>4</code></td><td>Tool-call rounds per utterance before the brain stops</td></tr>
@@ -561,7 +561,7 @@ AWS_REGION=us-east-1</code></pre>
         <p><strong>What this release does not do.</strong></p>
         <ul>
           <li><strong>Provider vision is not shipped.</strong> <code>WAYFINDER_VISION=provider</code> is not implemented in this release — it does not enable provider vision. Use <code>WAYFINDER_VISION=textract</code>.</li>
-          <li><strong>Bedrock is gated.</strong> The Bedrock adapter is complete and selectable, but it is currently gated by AWS account verification; <code>WAYFINDER_PROVIDER=bedrock</code> switches it on once your account is enabled.</li>
+          <li><strong>Bedrock is not wired as a chat provider.</strong> The <code>bedrock</code> preset is listed but not wired as a <code>ChatProvider</code> in this release, and the Bedrock path remains gated by AWS account verification. Setting <code>BEDROCK_MODEL_ID</code> still enables the Bedrock brain and extractor when no chat provider is active.</li>
           <li><strong>The <code>anthropic</code> preset is not wired.</strong> The preset is listed but not wired in this release; use <code>openrouter</code> for native Anthropic models.</li>
           <li><strong>Meta models have no first-party API.</strong> They are served by <code>groq</code>, <code>together</code>, and <code>openrouter</code>.</li>
           <li><strong>Azure needs a deployment URL.</strong> Set <code>WAYFINDER_BASE_URL</code> to your Azure OpenAI deployment; the provider has no usable default.</li>
