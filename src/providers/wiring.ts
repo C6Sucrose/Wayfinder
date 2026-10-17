@@ -15,11 +15,15 @@ export function resolveWiring(
   const providerConfig = resolveProviderConfig(env);
   const provider = providerConfig.provider;
 
+  const providerWarnings = [...providerConfig.warnings];
   let brain: BrainKind;
   if (provider.kind === "chat" && provider.protocol === "openai-compatible") {
     brain = "provider";
   } else if (provider.kind === "chat" && provider.id === "bedrock") {
     brain = opts.bedrockConfigured ? "bedrock" : "rules";
+  } else if (provider.kind === "chat") {
+    brain = "rules";
+    providerWarnings.push(`${provider.id}: ${provider.protocol} is not wired yet; using rules`);
   } else {
     brain = opts.bedrockConfigured ? "bedrock" : "rules";
   }
@@ -43,5 +47,5 @@ export function resolveWiring(
       break;
   }
 
-  return { brain, vision, providerWarnings: providerConfig.warnings, visionWarnings };
+  return { brain, vision, providerWarnings, visionWarnings };
 }

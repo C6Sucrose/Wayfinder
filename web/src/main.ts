@@ -307,7 +307,7 @@ if (SpeechRecognitionCtor) {
       heard.textContent = finalText;
       void send(finalText);
       heard.textContent = "";
-    } else {
+    } else if (!sentFinal) {
       heard.textContent = final || interim;
     }
   };
@@ -345,7 +345,10 @@ if (SpeechRecognitionCtor) {
     } catch {
       resetTalk();
     }
-    if (heardNow && !sentFinal) {
+    if (sentFinal) {
+      heard.textContent = "";
+    } else if (heardNow) {
+      sentFinal = true;
       heard.textContent = "";
       void send(heardNow);
     }
