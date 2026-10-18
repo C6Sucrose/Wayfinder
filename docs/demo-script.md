@@ -122,3 +122,127 @@ Captured fallback lines (reproduced above, in order):
   size as well as the body copy.
 - The transcript and brain badge are `aria-live` regions, so the spoken replies
   are also announced when driven by the talk or quick-pick buttons.
+
+---
+
+## Recording the three-minute video
+
+This is the runbook for the submitted video. The script above is the spoken
+content; this section is the production plan.
+
+### Pre-record checklist
+
+1. **Decide the honest configuration.** Either:
+   - offline only (rule brain, no vision) — always works; or
+   - rule brain + `WAYFINDER_VISION=textract` with AWS credentials — gives real
+     document reading on camera.
+   Do **not** record claiming a hosted brain unless `WAYFINDER_PROVIDER` is set
+   and `/capabilities` confirms it.
+2. Build and start clean:
+   ```bash
+   npm run build
+   npm start
+   ```
+   Remove any previous data directory so counts are predictable.
+3. Start the host: `npm run dev:web`, open `http://127.0.0.1:5173`.
+4. Check `http://127.0.0.1:8080/capabilities` and note the exact `brain` and
+   `vision` values. Those are what you may say on camera.
+5. Grant microphone permission, and confirm the orb reacts to your voice before
+   recording (the gain bar should move).
+6. Browser: hide bookmarks bar, close other tabs and notifications, 100% zoom.
+7. Capture at 1920×1080, 30 fps, system audio on, cursor visible but still.
+8. Do one silent dry run of the click path, then record in one take.
+9. Add English captions after recording; the submission requires English.
+
+### Timing budget (180 s total)
+
+| Time | Beat | On screen |
+|---|---|---|
+| 0:00–0:15 | Thesis, one sentence | Orb idle, breathing |
+| 0:15–0:40 | "Read my mail" | Pipeline lights Capture → Correlate; ticker; document cards |
+| 0:40–1:05 | "What do I need to deal with?" | Backlog threads, urgency meters, reminder counts |
+| 1:05–1:30 | Refusal | Refusal card, reason, escalate button |
+| 1:30–1:55 | "Prove it" | Verification screen, chain seals, terminal hash, Copy |
+| 1:55–2:20 | "Where are my keys?" | Object memory card |
+| 2:20–2:45 | Accessibility | Larger text, dark theme, Motion off, keyboard focus |
+| 2:45–3:00 | Honest close | Ledger + "recorded confirmation" wording |
+
+### Shot list with exact lines
+
+**0:00 — Opening (15 s).** No clicks. Say:
+
+> "Sighted people check their post by glancing at it. A blind person can't — and when
+> they say what a letter claimed, they're often disbelieved. Wayfinder is built for
+> that gap: it reads the paperwork, acts only within limits you set, and can prove
+> what it did."
+
+**0:15 — Read (25 s).** Say "Remember my keys are on the kitchen counter." first if
+you want the object beat later. Then say:
+
+> "Read my mail."
+
+Watch the pipeline: Capture lights, then Correlate. Point at the cards.
+
+> "Each document becomes a card: who it's from, what's owed, when. Low-confidence
+> reads are marked, not guessed at."
+
+**0:40 — Triage (25 s).** Click **Backlog**. Say:
+
+> "What do I need to deal with?"
+
+> "Threads, ranked by urgency. This one is a third reminder, and it shows the
+> deadline — not a bare count."
+
+**1:05 — Refusal (25 s).** Click a proposed action that the envelope forbids (for
+example discard). The refusal card appears. Say:
+
+> "I'm not allowed to do that, and it says so — with the reason — and offers to ask
+> my trusted contact instead. Nothing was changed, and the refusal is in the record."
+
+**1:30 — Proof (25 s).** Say:
+
+> "Prove it."
+
+The verification screen appears; the chain blocks light and the seal lands. Click
+**Copy** once to show the fingerprint is real, then say:
+
+> "The whole record is hash-chained. This screen recomputes it. If a single entry had
+> been altered, it would show the first broken link — and it doesn't."
+
+**1:55 — Object memory (25 s).** Say:
+
+> "Where are my keys?"
+
+> "Last seen on the kitchen counter."
+
+**2:20 — Accessibility (25 s).** Toggle **Larger text**, then **Dark**, then
+**Motion** off. Tab once to show the focus ring. Say:
+
+> "Everything you just saw is also spoken. Text scales, contrast holds, motion can be
+> switched off entirely, and every control is reachable from the keyboard."
+
+**2:45 — Close (15 s).**
+
+> "The record is internally consistent and tamper-evident. It proves what the system
+> saw and did — not that a bank confirmed it. That honesty is the product."
+
+### What not to claim on camera
+
+- Do **not** say Bedrock is running. It is gated by AWS account verification.
+- Do **not** say `WAYFINDER_VISION=provider` works; it is not implemented.
+- Do **not** describe confirmation as bank-verified or legally binding.
+- Do **not** imply the client is a real Alexa device; call it an MCP host.
+- Do **not** claim payment execution. The handoff prepares an instruction and a QR
+  code for the user's own banking app.
+
+### If something goes wrong mid-take
+
+- **No cards after "read my mail":** vision is not configured. Keep going and narrate
+  the Textract path honestly, or restart with `WAYFINDER_VISION=textract`.
+- **Brain badge reads `bedrock` unexpectedly:** stop; `BEDROCK_MODEL_ID` is set.
+  Unset it for a deterministic take.
+- **Orb does not move:** microphone permission was denied. The demo still works; say
+  "the level indicator needs microphone permission" and continue typing.
+- **A provider error appears:** the reply is a generic failure line; re-run the beat.
+  Do not attempt to explain a stack trace on camera.
+

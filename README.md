@@ -27,6 +27,7 @@ It renders interactive **MCP App** screens into any MCP Apps host (the bundled c
 - [Project layout](#project-layout)
 - [Development](#development)
 - [Documentation](#documentation)
+- [Submission artifacts](#submission-artifacts)
 - [License](#license)
 
 ## Why
@@ -292,7 +293,13 @@ The domain rules, the checksum and hash-chain logic, and the adapter contracts a
 
 - **[Interactive documentation](docs/index.html)** — the guide as a self-contained, searchable page (open it locally, or serve it from GitHub Pages).
 - **[Adapter recipes](docs/adapters/)** — how to enable and configure each optional port.
-- **[Demo script](docs/demo-script.md)** — the three-minute walkthrough, with offline fallback narration.
+- **[Demo script](docs/demo-script.md)** — the three-minute walkthrough, with offline fallback narration and a video runbook.
+
+## Submission artifacts
+
+- **[Submission summary](docs/submission.md)** — track declaration, artifact checklist, what is real and what is not.
+- **[Product feedback](docs/feedback/)** — what we learned building on Bedrock, Textract, the MCP SDK, MCP Apps, the web platform, and our tooling.
+- **[Friction log](docs/friction-log.md)** — what slowed the build, with resolutions and costs.
 
 ## License
 
