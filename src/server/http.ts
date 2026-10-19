@@ -59,12 +59,16 @@ export function createHttpApp(deps: HttpDeps) {
   if (deps.alexa) {
     const handler = createAlexaHandler(deps.alexa);
     app.post("/alexa", express.raw({ type: "application/json", limit: "1mb" }), async (req, res) => {
-      const raw = req.body instanceof Uint8Array ? req.body : Buffer.alloc(0);
-      const result = await handler(raw, {
-        ...(req.headers.signature !== undefined ? { signature: String(req.headers.signature) } : {}),
-        ...(req.headers.signaturecertchainurl !== undefined ? { certChainUrl: String(req.headers.signaturecertchainurl) } : {})
-      });
-      res.status(result.status).json(result.body);
+      try {
+        const raw = req.body instanceof Uint8Array ? req.body : Buffer.alloc(0);
+        const result = await handler(raw, {
+          ...(req.headers.signature !== undefined ? { signature: String(req.headers.signature) } : {}),
+          ...(req.headers.signaturecertchainurl !== undefined ? { certChainUrl: String(req.headers.signaturecertchainurl) } : {})
+        });
+        res.status(result.status).json(result.body);
+      } catch {
+        res.status(500).json({ error: "internal error" });
+      }
     });
   }
   app.use(express.json({ limit: "10mb" }));

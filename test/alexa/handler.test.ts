@@ -58,6 +58,26 @@ describe("alexa handler", () => {
     expect(result.status).toBe(400);
   });
 
+  it.each([null, [], "x", 42, {}])("rejects the non-envelope body %j", async (value) => {
+    let verified = 0;
+    const { calls, deps: d } = deps({
+      verify: async () => { verified += 1; return { ok: true as const }; }
+    });
+    const result = await createAlexaHandler(d)(Buffer.from(JSON.stringify(value)));
+    expect(result.status).toBe(400);
+    expect(calls).toEqual([]);
+    expect(verified).toBe(0);
+  });
+
+  it("treats a thrown verifier as unauthorized", async () => {
+    const { calls, deps: d } = deps({
+      verify: async () => { throw new Error("boom"); }
+    });
+    const result = await createAlexaHandler(d)(body("BacklogIntent"));
+    expect(result.status).toBe(401);
+    expect(calls).toEqual([]);
+  });
+
   it("speaks an apology when the agent fails", async () => {
     const { deps: d } = deps({
       agent: { brainName: "rules", async handle() { throw new Error("boom"); } }

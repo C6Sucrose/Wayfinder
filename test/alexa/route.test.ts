@@ -55,4 +55,36 @@ describe("POST /alexa", () => {
     const result = await post(app(undefined), validBody);
     expect(result.status).toBe(404);
   });
+
+  it("returns 400 when the body is JSON null", async () => {
+    const result = await post(app({
+      verify: async () => ({ ok: true }),
+      agent: { brainName: "rules", async handle() { return { reply: "x", toolCalls: [], brain: "rules" }; } },
+      sessions: { history: () => [], append: () => undefined, size: () => 0, clear: () => undefined },
+      verifyEnabled: true
+    }), "null");
+    expect(result.status).toBe(400);
+  });
+
+  it("returns 401 when the verifier throws", async () => {
+    const result = await post(app({
+      verify: async () => { throw new Error("boom"); },
+      agent: { brainName: "rules", async handle() { return { reply: "x", toolCalls: [], brain: "rules" }; } },
+      sessions: { history: () => [], append: () => undefined, size: () => 0, clear: () => undefined },
+      verifyEnabled: true
+    }), validBody);
+    expect(result.status).toBe(401);
+  });
+
+  it("passes the posted bytes to the verifier unchanged", async () => {
+    let seen: Uint8Array | undefined;
+    const result = await post(app({
+      verify: async (input) => { seen = input.rawBody; return { ok: true }; },
+      agent: { brainName: "rules", async handle() { return { reply: "hello", toolCalls: [], brain: "rules" }; } },
+      sessions: { history: () => [], append: () => undefined, size: () => 0, clear: () => undefined },
+      verifyEnabled: true
+    }), validBody);
+    expect(result.status).toBe(200);
+    expect(Buffer.from(seen ?? new Uint8Array()).equals(Buffer.from(validBody))).toBe(true);
+  });
 });
