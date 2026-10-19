@@ -21,6 +21,5 @@
       "endpoint": { "uri": "https://YOUR_HOST/alexa" },
       "interfaces": [{ "type": "ALEXA_PRESENTATION_APL" }]
     }
-  },
-  "manifestVersionNote": "Set endpoint.uri to your public HTTPS deployment before submitting."
+  }
 }

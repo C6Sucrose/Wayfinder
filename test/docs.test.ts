@@ -94,10 +94,30 @@ describe("public documentation", () => {
     const manifest = JSON.parse(readFileSync("docs/alexa/skill.json", "utf8"));
     expect(manifest.apis.custom.endpoint.uri).toContain("/alexa");
     const model = JSON.parse(readFileSync("docs/alexa/interaction-model.json", "utf8"));
-    const names = model.interactionModel.languageModel.intents.map((i: { name: string }) => i.name);
-    for (const intent of ["ReadMailIntent", "BacklogIntent", "DueTodayIntent", "ProveIntent", "WhereIsIntent", "RememberIntent"]) {
+    const intents = model.interactionModel.languageModel.intents as Array<{
+      name: string;
+      slots?: Array<{ name: string; type: string }>;
+    }>;
+    const names = intents.map((i) => i.name);
+    for (const intent of [
+      "AMAZON.HelpIntent",
+      "AMAZON.StopIntent",
+      "AMAZON.CancelIntent",
+      "AMAZON.FallbackIntent",
+      "ReadMailIntent",
+      "BacklogIntent",
+      "DueTodayIntent",
+      "ProveIntent",
+      "WhereIsIntent",
+      "RememberIntent"
+    ]) {
       expect(names).toContain(intent);
     }
+    const slots = intents.flatMap((i) => i.slots ?? []);
+    expect(slots.map((s) => s.name)).toContain("item");
+    expect(slots.map((s) => s.name)).toContain("location");
+    expect(slots.map((s) => s.type)).toContain("ITEM");
+    expect(slots.map((s) => s.type)).toContain("LOCATION");
     const readme = readFileSync("docs/alexa/README.md", "utf8");
     expect(readme).toContain("WAYFINDER_ALEXA_VERIFY");
     expect(readme.toLowerCase()).toContain("could not test against");
@@ -117,7 +137,11 @@ describe("public documentation", () => {
       read("docs/feedback/web-platform.md"),
       read("docs/feedback/tooling.md"),
       read("docs/diagrams/architecture.svg"),
-      read("docs/diagrams/authority.svg")
+      read("docs/diagrams/authority.svg"),
+      read("docs/alexa/skill.json"),
+      read("docs/alexa/interaction-model.json"),
+      read("docs/alexa/README.md"),
+      read("docs/alexa/sample-request.json")
     ].join("\n");
     for (const secret of ["958452485624", "L-F4DDD3EB", "L-58BE175A", "arn:aws:", "178993905600770"]) {
       expect(haystack, secret).not.toContain(secret);

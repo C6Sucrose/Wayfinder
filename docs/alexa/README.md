@@ -2,7 +2,7 @@
 
 ## What this is
 
-This directory holds the artifacts for a classic Alexa Skill host. The skill registers `POST /alexa` on the same Wayfinder server that exposes the MCP surface, and it calls the same brain. It does not fork behavior: intents are routed into the existing agent and answered with SSML, a Simple card, and a minimal APL document.
+This directory holds the artifacts for a classic Alexa Skill host. The skill registers `POST /alexa` on the same Wayfinder server that exposes the MCP surface, and it calls the same brain. It does not fork behavior: intents are routed into the existing agent and answered with SSML. Agent-backed answers also include a Simple card, and devices that advertise APL support get a minimal APL document.
 
 The invocation name is `wayfinder` and the published skill name is `Wayfinder`.
 
@@ -13,6 +13,8 @@ The invocation name is `wayfinder` and the published skill name is `Wayfinder`.
 - The skill enabled for your own developer account so you can test it in the console.
 
 Nothing here registers the skill for you. Publishing and certification happen in your Amazon developer account.
+
+Before you upload the manifest, set `apis.custom.endpoint.uri` to your public HTTPS deployment.
 
 ## Steps
 
@@ -31,7 +33,7 @@ Nothing here registers the skill for you. Publishing and certification happen in
 | `WAYFINDER_ALEXA` | `on` | `off` disables the endpoint entirely; no `/alexa` route is mounted. |
 | `WAYFINDER_ALEXA_VERIFY` | `on` | `off` disables ASK request-signature checks. **Local testing only.** |
 
-**Never set `WAYFINDER_ALEXA_VERIFY=off` on a public endpoint.** With verification off, anyone who can reach the URL can drive the skill and the brain behind it. The bypass exists only so a developer can exercise the handler without Amazon's signed headers.
+**Never set `WAYFINDER_ALEXA_VERIFY=off` on a public endpoint.** With verification off, anyone who can reach the URL can drive the skill and the brain behind it. The bypass exists only so a developer can exercise the handler without Amazon's signed request.
 
 ## Local testing
 
@@ -50,6 +52,6 @@ The sample sends a `BacklogIntent`. Without the bypass, the same request has no 
 
 - We could not test against Amazon's simulator from this environment. The artifacts and endpoint were built and exercised locally.
 - Request and response shapes are unit-tested, including signature verification, intent routing, SSML/card/APL construction, and session handling.
-- Root-CA pinning is **not** implemented. Verification relies on TLS to `s3.amazonaws.com`, the SAN check on the fetched certificate, certificate validity dates, and the RSA signature over the request body and headers.
+- Root-CA pinning is **not** implemented. Verification relies on TLS to `s3.amazonaws.com`, the SAN check on the fetched certificate, certificate validity dates, and the RSA signature over the request body (with a separate timestamp freshness check).
 - The skill adds no capabilities beyond what MCP already exposes. It is a transport and presentation layer, not a new set of actions.
 - Registration, enablement, and certification remain the operator's steps in the Amazon developer account.
