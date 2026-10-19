@@ -298,7 +298,7 @@ The domain rules, the checksum and hash-chain logic, and the adapter contracts a
 
 ## Alexa skill
 
-A classic Alexa Skill host is mounted at `POST /alexa` on the same server, protected by ASK request-signature verification and answered with SSML, a Simple card, and a minimal APL document. The manifest, interaction model, and setup guide are in [`docs/alexa/`](docs/alexa/README.md). `WAYFINDER_ALEXA_VERIFY=off` exists for local testing only and must never be used on a public endpoint. Certification still requires your own Amazon developer account and a public HTTPS endpoint.
+A classic Alexa Skill host is mounted at `POST /alexa` on the same server, protected by ASK request-signature verification and answered with SSML; agent-backed answers also include a Simple card, and devices that advertise APL support get a minimal APL document. The manifest, interaction model, and setup guide are in [`docs/alexa/`](docs/alexa/README.md). `WAYFINDER_ALEXA_VERIFY=off` exists for local testing only and must never be used on a public endpoint. Certification still requires your own Amazon developer account and a public HTTPS endpoint.
 
 ## Submission artifacts
 
