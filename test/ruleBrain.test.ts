@@ -30,6 +30,13 @@ describe("createRuleBrain", () => {
     expect(calls[0]).toEqual({ name: "find_object", input: { name: "keys" } });
   });
 
+  it("routes 'prove it' to verify_ledger", async () => {
+    const { calls, exec } = executor();
+    const brain = createRuleBrain({ executor: exec });
+    await brain.respond("prove it", []);
+    expect(calls[0]!.name).toBe("verify_ledger");
+  });
+
   it("falls back to daily_briefing for anything else", async () => {
     const { calls, exec } = executor();
     const brain = createRuleBrain({ executor: exec });

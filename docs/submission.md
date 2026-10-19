@@ -79,7 +79,7 @@ This matters more than the feature list.
 
 **Alexa skill**
 
-A classic Alexa Skill host is implemented at `POST /alexa`, with ASK request-signature verification, intent routing into the existing brain, and SSML, Simple card, and APL responses. The manifest, interaction model, sample request, and setup guide are in [`docs/alexa/`](alexa/README.md). Unit tests cover verification and response shapes. Registering and certifying the skill in an Amazon developer account is the operator's step; it is not included here.
+A classic Alexa Skill host is implemented at `POST /alexa`, with ASK request-signature verification, intent routing into the existing brain, and SSML replies, a Simple card on agent-backed answers, and an APL document on devices that advertise support. The manifest, interaction model, sample request, and setup guide are in [`docs/alexa/`](alexa/README.md). Unit tests cover verification and response shapes. Registering and certifying the skill in an Amazon developer account is the operator's step; it is not included here.
 
 **Implemented but currently blocked externally**
 
