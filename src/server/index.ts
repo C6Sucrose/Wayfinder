@@ -19,6 +19,9 @@ import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-r
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { resolveAlexaConfig } from "../alexa/config.js";
+import { createSessionStore } from "../alexa/sessions.js";
+import { verifyAlexaRequest } from "../alexa/verify.js";
 
 const dir = process.env.WAYFINDER_DATA_DIR ?? "data";
 const captureRoot = process.env.WAYFINDER_CAPTURE_ROOT ?? dir;
@@ -89,33 +92,6 @@ const providers: ProviderSummary = {
   vision: { provider: activeVision }
 };
 
-const deps: HttpDeps = {
-  store,
-  allowedOrigins,
-  adapterConfig,
-  adapters,
-  providers,
-  ...(notify !== undefined ? { notify } : {}),
-  ...(extract ? { extract } : {})
-};
-const app = createHttpApp(deps);
-
-const worker = createScanWorker({
-  store,
-  onComplete: (id) => {
-    void (async () => {
-      try {
-        app.locals.notifyAll(scanCompleteMessage(await store.getScan(id)));
-      } catch (err) {
-        console.error(`[wayfinder] scan ${id} status lookup failed:`, err);
-        app.locals.notifyAll(scanCompleteMessage(null));
-      }
-    })();
-  },
-  ...(extract ? { extract } : {})
-});
-deps.worker = worker;
-
 const mcpUrl = new URL(`http://${host}:${port}/mcp`);
 const mcpTransport = new StreamableHTTPClientTransport(mcpUrl);
 const mcpClient = new Client({ name: "wayfinder-agent", version: "0.1.0" });
@@ -149,7 +125,7 @@ const client: McpClientLike = {
   async close() { if (connecting) { await connecting; await mcpClient.close(); } }
 };
 const executor = createMcpExecutor({ client });
-deps.agent = brainProvider !== undefined
+const agent = brainProvider !== undefined
   ? createAgentService({
       executor,
       provider: brainProvider,
@@ -160,6 +136,49 @@ deps.agent = brainProvider !== undefined
       executor,
       ...(useBedrockBrain && converse !== undefined && modelId !== undefined ? { client: converse, modelId } : {})
     });
+
+const alexaConfig = resolveAlexaConfig(process.env);
+for (const warning of alexaConfig.warnings) console.warn(`[wayfinder] alexa: ${warning}`);
+
+const deps: HttpDeps = {
+  store,
+  allowedOrigins,
+  adapterConfig,
+  adapters,
+  providers,
+  agent,
+  channels: { alexa: alexaConfig.mount ? (alexaConfig.verifyEnabled ? "skill" : "skill-dev") : "none" },
+  ...(notify !== undefined ? { notify } : {}),
+  ...(extract ? { extract } : {}),
+  ...(alexaConfig.mount
+    ? {
+        alexa: {
+          verify: verifyAlexaRequest,
+          agent,
+          sessions: createSessionStore(),
+          verifyEnabled: alexaConfig.verifyEnabled,
+          ...(alexaConfig.appId !== undefined ? { appId: alexaConfig.appId } : {})
+        }
+      }
+    : {})
+};
+const app = createHttpApp(deps);
+
+const worker = createScanWorker({
+  store,
+  onComplete: (id) => {
+    void (async () => {
+      try {
+        app.locals.notifyAll(scanCompleteMessage(await store.getScan(id)));
+      } catch (err) {
+        console.error(`[wayfinder] scan ${id} status lookup failed:`, err);
+        app.locals.notifyAll(scanCompleteMessage(null));
+      }
+    })();
+  },
+  ...(extract ? { extract } : {})
+});
+deps.worker = worker;
 
 console.log(`[wayfinder] brain: ${providers.brain.provider}; vision: ${providers.vision.provider}`);
 app.listen(port, host, () => console.log(`Wayfinder MCP server on ${host}:${port}`));

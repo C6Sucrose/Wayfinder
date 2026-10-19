@@ -1,0 +1,25 @@
+{
+  "manifestVersion": "1.0",
+  "publishingInformation": {
+    "locales": {
+      "en-US": {
+        "name": "Wayfinder",
+        "summary": "Verifiable agency for the paperwork you cannot glance at.",
+        "description": "Wayfinder reads your post, tracks what is owed, acts within limits you set, and can prove what it did.",
+        "examplePhrases": [
+          "Alexa, open Wayfinder",
+          "Alexa, ask Wayfinder what needs dealing with",
+          "Alexa, ask Wayfinder to prove my record"
+        ]
+      }
+    },
+    "isAvailableWorldwide": false,
+    "category": "UTILITIES"
+  },
+  "apis": {
+    "custom": {
+      "endpoint": { "uri": "https://YOUR_HOST/alexa" },
+      "interfaces": [{ "type": "ALEXA_PRESENTATION_APL" }]
+    }
+  }
+}

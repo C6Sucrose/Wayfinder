@@ -27,6 +27,7 @@ It renders interactive **MCP App** screens into any MCP Apps host (the bundled c
 - [Project layout](#project-layout)
 - [Development](#development)
 - [Documentation](#documentation)
+- [Alexa skill](#alexa-skill)
 - [Submission artifacts](#submission-artifacts)
 - [License](#license)
 
@@ -294,6 +295,10 @@ The domain rules, the checksum and hash-chain logic, and the adapter contracts a
 - **[Interactive documentation](docs/index.html)** — the guide as a self-contained, searchable page (open it locally, or serve it from GitHub Pages).
 - **[Adapter recipes](docs/adapters/)** — how to enable and configure each optional port.
 - **[Demo script](docs/demo-script.md)** — the three-minute walkthrough, with offline fallback narration and a video runbook.
+
+## Alexa skill
+
+A classic Alexa Skill host is mounted at `POST /alexa` on the same server, protected by ASK request-signature verification and answered with SSML; agent-backed answers also include a Simple card, and devices that advertise APL support get a minimal APL document. The manifest, interaction model, and setup guide are in [`docs/alexa/`](docs/alexa/README.md). `WAYFINDER_ALEXA_VERIFY=off` exists for local testing only and must never be used on a public endpoint. Certification still requires your own Amazon developer account and a public HTTPS endpoint.
 
 ## Submission artifacts
 
