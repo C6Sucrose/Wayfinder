@@ -3,6 +3,11 @@ import { createLedger } from "../domain/ledgerLog.js";
 import { verifyLedger } from "../domain/ledger.js";
 import type { Store } from "../storage/types.js";
 
+export interface ProviderSummary {
+  brain: { provider: string; model?: string; protocol?: string };
+  vision: { provider: string };
+}
+
 export interface Capabilities {
   adapters: {
     notifier: "webhook" | "null";
@@ -13,9 +18,21 @@ export interface Capabilities {
     assist: "null";
   };
   chain: { head: string; verified: boolean };
+  brain?: ProviderSummary["brain"];
+  vision?: ProviderSummary["vision"];
 }
 
-export function buildCapabilities(config: AdapterConfig, chain: { head: string; verified: boolean }): Capabilities {
+export function buildCapabilities(config: AdapterConfig, chain: { head: string; verified: boolean }): Capabilities;
+export function buildCapabilities(
+  config: AdapterConfig,
+  chain: { head: string; verified: boolean },
+  providers: ProviderSummary
+): Capabilities & { brain: ProviderSummary["brain"]; vision: ProviderSummary["vision"] };
+export function buildCapabilities(
+  config: AdapterConfig,
+  chain: { head: string; verified: boolean },
+  providers?: ProviderSummary
+): Capabilities {
   return {
     adapters: {
       notifier: config.notifier.kind,
@@ -25,7 +42,17 @@ export function buildCapabilities(config: AdapterConfig, chain: { head: string; 
       documentSource: config.documentSource.kind,
       assist: config.assist.kind
     },
-    chain
+    chain,
+    ...(providers !== undefined
+      ? {
+          brain: {
+            provider: providers.brain.provider,
+            ...(providers.brain.model !== undefined ? { model: providers.brain.model } : {}),
+            ...(providers.brain.protocol !== undefined ? { protocol: providers.brain.protocol } : {})
+          },
+          vision: { provider: providers.vision.provider }
+        }
+      : {})
   };
 }
 

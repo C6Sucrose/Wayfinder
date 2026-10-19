@@ -10,6 +10,7 @@ import { createHttpApp } from "../src/server/http.js";
 import { createAdapters } from "../src/adapters/registry.js";
 import { resolveAdapterConfig } from "../src/adapters/config.js";
 import { createNotifyQueue } from "../src/adapters/notifyQueue.js";
+import { buildCapabilities } from "../src/adapters/capabilities.js";
 import { copy } from "../src/domain/copy.js";
 
 async function connect(env: NodeJS.ProcessEnv = {}) {
@@ -50,6 +51,17 @@ describe("capability disclosure", () => {
     } finally {
       server.close();
     }
+  });
+
+  it("reports the active brain and vision providers", () => {
+    const config = resolveAdapterConfig({});
+    const capabilities = buildCapabilities(config, { head: "h", verified: true }, {
+      brain: { provider: "google", model: "gemini-2.0-flash", protocol: "openai-compatible" },
+      vision: { provider: "textract" }
+    });
+    expect(capabilities.brain.provider).toBe("google");
+    expect(capabilities.vision.provider).toBe("textract");
+    expect(JSON.stringify(capabilities)).not.toContain("apiKey");
   });
 });
 

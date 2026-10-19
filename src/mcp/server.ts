@@ -17,7 +17,7 @@ import { withLifecycle } from "../domain/lifecycle.js";
 import { buildRecordReport, verifyLedger } from "../domain/ledger.js";
 import { ibanIsValid } from "../domain/validity.js";
 import type { Item } from "../domain/model.js";
-import { buildCapabilities, readChain } from "../adapters/capabilities.js";
+import { buildCapabilities, readChain, type ProviderSummary } from "../adapters/capabilities.js";
 import type { AdapterBundle } from "../adapters/types.js";
 import { nullAdapters } from "../adapters/null.js";
 import type { AdapterConfig } from "../adapters/config.js";
@@ -32,6 +32,7 @@ export interface ServerDeps {
   adapters?: AdapterBundle;
   adapterConfig?: AdapterConfig;
   notify?: NotifyQueue;
+  providers?: ProviderSummary;
 }
 
 export function buildServer(deps: ServerDeps): McpServer {
@@ -586,18 +587,18 @@ export function buildServer(deps: ServerDeps): McpServer {
     async (uri) => {
       const config = deps.adapterConfig;
       const chain = await readChain(deps.store);
-      const capabilities = buildCapabilities(
-        config ?? {
-          notifier: { kind: "null" },
-          calendar: { kind: "null" },
-          payment: { kind: "null" },
-          signature: { kind: "local" },
-          documentSource: { kind: "null" },
-          assist: { kind: "null" },
-          warnings: []
-        },
-        chain
-      );
+      const fallback: AdapterConfig = {
+        notifier: { kind: "null" },
+        calendar: { kind: "null" },
+        payment: { kind: "null" },
+        signature: { kind: "local" },
+        documentSource: { kind: "null" },
+        assist: { kind: "null" },
+        warnings: []
+      };
+      const capabilities = deps.providers !== undefined
+        ? buildCapabilities(config ?? fallback, chain, deps.providers)
+        : buildCapabilities(config ?? fallback, chain);
       return {
         contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(capabilities) }]
       };

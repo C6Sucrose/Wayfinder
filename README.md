@@ -17,6 +17,7 @@ It renders interactive **MCP App** screens into any MCP Apps host (the bundled c
 - [What it does](#what-it-does)
 - [Who it is for](#who-it-is-for)
 - [Quick start](#quick-start)
+- [Choosing a model](#choosing-a-model)
 - [Using it](#using-it)
 - [MCP surface](#mcp-surface)
 - [The record](#the-record)
@@ -26,6 +27,7 @@ It renders interactive **MCP App** screens into any MCP Apps host (the bundled c
 - [Project layout](#project-layout)
 - [Development](#development)
 - [Documentation](#documentation)
+- [Submission artifacts](#submission-artifacts)
 - [License](#license)
 
 ## Why
@@ -93,9 +95,72 @@ A full three-minute walkthrough, including the offline fallback narration, is in
 | `WAYFINDER_CAPTURE_ROOT` | `WAYFINDER_DATA_DIR` | Root the image reader is allowed to read from |
 | `ALLOWED_ORIGINS` | *(empty)* | Comma-separated origins accepted for `/mcp` and `/api/agent` |
 | `BEDROCK_MODEL_ID` | *(unset)* | Enables the Amazon Bedrock brain and image reader |
-| `AWS_REGION` | `eu-central-1` | Region for Bedrock |
+| `AWS_REGION` | `us-east-1` | Region for Textract and Bedrock |
 
-Without `BEDROCK_MODEL_ID` the server uses a deterministic **rule brain** that routes each utterance to one tool call, and the reader reports itself unavailable. Everything else — correlation, authority, the ledger, and every screen — works offline.
+By default, with no chat provider and no `BEDROCK_MODEL_ID` configured, the server uses a deterministic **rule brain** that routes each utterance to one tool call, and the reader reports itself unavailable. Everything else — correlation, authority, the ledger, and every screen — works offline.
+
+## Choosing a model
+
+Bring your own model. One port, many providers; `rules` is the default and needs no key.
+
+Three wire protocols sit behind the chat port — `openai-compatible`, `anthropic-messages`, and `bedrock-converse`. A `rules` run starts with no warnings.
+
+| Provider id | Protocol | Default model | Key env | Images |
+|---|---|---|---|---|
+| `rules` | — | — | — | No |
+| `openai` | `openai-compatible` | `gpt-4o-mini` | `OPENAI_API_KEY` | Yes |
+| `azure` | `openai-compatible` | `gpt-4o-mini` | `AZURE_OPENAI_API_KEY` | Yes |
+| `google` | `openai-compatible` | `gemini-2.0-flash` | `GEMINI_API_KEY` | Yes |
+| `anthropic` | `anthropic-messages` | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` | Yes |
+| `bedrock` | `bedrock-converse` | *(none; legacy path uses `BEDROCK_MODEL_ID`)* | AWS credential chain | Yes |
+| `deepseek` | `openai-compatible` | `deepseek-chat` | `DEEPSEEK_API_KEY` | No |
+| `qwen` | `openai-compatible` | `qwen-plus` | `DASHSCOPE_API_KEY` | No |
+| `moonshot` | `openai-compatible` | `moonshot-v1-8k` | `MOONSHOT_API_KEY` | No |
+| `zhipu` | `openai-compatible` | `glm-4-flash` | `ZHIPU_API_KEY` | No |
+| `minimax` | `openai-compatible` | `abab6.5s-chat` | `MINIMAX_API_KEY` | No |
+| `groq` | `openai-compatible` | `llama-3.3-70b-versatile` | `GROQ_API_KEY` | No |
+| `together` | `openai-compatible` | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | `TOGETHER_API_KEY` | No |
+| `mistral` | `openai-compatible` | `mistral-large-latest` | `MISTRAL_API_KEY` | No |
+| `openrouter` | `openai-compatible` | `openai/gpt-4o-mini` | `OPENROUTER_API_KEY` | Yes |
+| `custom` | `openai-compatible` | *(set `WAYFINDER_MODEL`)* | `WAYFINDER_API_KEY` | No |
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `WAYFINDER_PROVIDER` | `rules` | Provider id from the table above; `rules` needs no key |
+| `WAYFINDER_MODEL` | provider default | Defaults per provider. Required for `custom`; used for the selected chat provider when set. The Bedrock path is configured separately via `BEDROCK_MODEL_ID`. |
+| `WAYFINDER_BASE_URL` | provider default | Endpoint override; required for `custom`, and point Azure at your deployment |
+| `WAYFINDER_API_KEY` | provider key env | Explicit key override; otherwise the provider's key env is used |
+| `WAYFINDER_MAX_ROUNDS` | `4` | Tool-call rounds per utterance before the brain stops |
+| `WAYFINDER_VISION` | `none` | `none`, `textract`, or `bedrock`; `provider` is not implemented in this release |
+| `WAYFINDER_TIMEOUT_MS` | `15000` | Per-request provider timeout in milliseconds |
+| `AWS_REGION` | `us-east-1` | Region for Textract and Bedrock |
+
+A hosted brain, for example Google:
+
+```bash
+WAYFINDER_PROVIDER=google
+GEMINI_API_KEY=...
+WAYFINDER_MODEL=gemini-2.0-flash
+```
+
+Document vision through Amazon Textract:
+
+```bash
+WAYFINDER_VISION=textract
+AWS_REGION=us-east-1
+```
+
+### Honest limitations
+
+- **Provider vision is not shipped.** `WAYFINDER_VISION=provider` is not implemented in this release — it does not enable provider vision. Use `WAYFINDER_VISION=textract`.
+- **Bedrock is not wired as a chat provider.** The `bedrock` preset is listed but not wired as a `ChatProvider` in this release, and the Bedrock path remains gated by AWS account verification. Setting `BEDROCK_MODEL_ID` still enables the Bedrock brain and extractor when no chat provider is active.
+- **The `anthropic` preset is not wired.** The preset is listed but not wired in this release; use `openrouter` for native Anthropic models.
+- **Meta models have no first-party API.** They are served by `groq`, `together`, and `openrouter`.
+- **Azure needs a deployment URL.** Set `WAYFINDER_BASE_URL` to your Azure OpenAI deployment; the provider has no usable default.
+
+### Egress
+
+Choosing a hosted provider sends utterances to that provider. `rules`, `textract`, and `bedrock` stay within your AWS account and the configured `AWS_REGION`; `rules` itself makes no network calls.
 
 ## Using it
 
@@ -201,8 +266,9 @@ src/
   domain/     Pure domain logic: model, correlation, authority, ledger, backlog, copy
   mcp/        MCP server: tools, resources, the app resource
   server/     HTTP host: Express app, agent endpoint, MCP transport
-  scan/       Scan worker and the Bedrock image reader
-  agent/      Agent brains (rule-based and Bedrock) and the MCP executor
+  scan/       Scan worker, Textract extractor, and the Bedrock image reader
+  agent/      Agent brains (rules, Bedrock, provider-backed) and the MCP executor
+  providers/  Chat port, provider presets, config, and the OpenAI-compatible adapter
   adapters/   Ports, null adapters, config, registry, notify queue, reference adapters
   storage/    File-backed store
 ui/           The MCP App view (single self-contained HTML bundle)
@@ -227,7 +293,13 @@ The domain rules, the checksum and hash-chain logic, and the adapter contracts a
 
 - **[Interactive documentation](docs/index.html)** — the guide as a self-contained, searchable page (open it locally, or serve it from GitHub Pages).
 - **[Adapter recipes](docs/adapters/)** — how to enable and configure each optional port.
-- **[Demo script](docs/demo-script.md)** — the three-minute walkthrough, with offline fallback narration.
+- **[Demo script](docs/demo-script.md)** — the three-minute walkthrough, with offline fallback narration and a video runbook.
+
+## Submission artifacts
+
+- **[Submission summary](docs/submission.md)** — track declaration, artifact checklist, what is real and what is not.
+- **[Product feedback](docs/feedback/)** — what we learned building on Bedrock, Textract, the MCP SDK, MCP Apps, the web platform, and our tooling.
+- **[Friction log](docs/friction-log.md)** — what slowed the build, with resolutions and costs.
 
 ## License
 

@@ -53,15 +53,52 @@ describe("public documentation", () => {
     expect(existsSync("docs/superpowers")).toBe(false);
   });
 
+  it("ships the submission artifacts", () => {
+    for (const file of [
+      "docs/submission.md",
+      "docs/friction-log.md",
+      "docs/feedback/README.md",
+      "docs/feedback/aws.md",
+      "docs/feedback/mcp-sdk.md",
+      "docs/feedback/mcp-apps.md",
+      "docs/feedback/web-platform.md",
+      "docs/feedback/tooling.md"
+    ]) {
+      expect(existsSync(file), file).toBe(true);
+    }
+    const submission = read("docs/submission.md");
+    expect(submission).toContain("Alexa+");
+    expect(submission).toContain("AWS Builder");
+    expect(submission).toContain("Open Source");
+    expect(submission).toContain("docs/feedback/");
+    expect(submission).toContain("docs/friction-log.md");
+  });
+
+  it("states the honest limitations in the submission", () => {
+    const submission = read("docs/submission.md").toLowerCase();
+    for (const claim of ["not legal evidence", "recorded confirmation", "not implemented"]) {
+      expect(submission, claim).toContain(claim);
+    }
+    expect(submission).not.toContain("bank-verified");
+  });
+
   it("leaks no account identifiers into the public docs", () => {
     const haystack = [
       read("README.md"),
       read("docs/index.html"),
       read("docs/demo-script.md"),
+      read("docs/submission.md"),
+      read("docs/friction-log.md"),
+      read("docs/feedback/README.md"),
+      read("docs/feedback/aws.md"),
+      read("docs/feedback/mcp-sdk.md"),
+      read("docs/feedback/mcp-apps.md"),
+      read("docs/feedback/web-platform.md"),
+      read("docs/feedback/tooling.md"),
       read("docs/diagrams/architecture.svg"),
       read("docs/diagrams/authority.svg")
     ].join("\n");
-    for (const secret of ["958452485624", "L-F4DDD3EB", "L-58BE175A", "arn:aws:"]) {
+    for (const secret of ["958452485624", "L-F4DDD3EB", "L-58BE175A", "arn:aws:", "178993905600770"]) {
       expect(haystack, secret).not.toContain(secret);
     }
   });
