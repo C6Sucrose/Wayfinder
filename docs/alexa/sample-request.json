@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "session": { "new": true, "sessionId": "amzn1.echo-api.session.example", "application": { "applicationId": "amzn1.ask.skill.example" } },
+  "context": { "System": { "device": { "supportedInterfaces": { "Alexa.Presentation.APL": {} } } } },
+  "request": {
+    "type": "IntentRequest",
+    "requestId": "amzn1.echo-api.request.example",
+    "timestamp": "2026-10-17T10:00:00Z",
+    "locale": "en-US",
+    "intent": { "name": "BacklogIntent", "confirmationStatus": "NONE" }
+  }
+}
