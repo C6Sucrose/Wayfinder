@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { verifyAlexaRequest } from "../../src/alexa/verify.js";
+import { timestampFresh, verifyAlexaRequest } from "../../src/alexa/verify.js";
 
 const KEY = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PUBLIC_PEM = KEY.publicKey.export({ type: "spki", format: "pem" }).toString();
@@ -30,6 +30,42 @@ function input(overrides: Record<string, unknown> = {}) {
     ...overrides
   };
 }
+
+function fetched(url: string) {
+  return {
+    rawBody: body,
+    headers: { signature: signature(), certChainUrl: url },
+    timestamp: "2026-10-17T10:00:00Z",
+    now: new Date("2026-10-17T10:00:10Z"),
+    certificate: facts
+  };
+}
+
+function stubFetch(response: () => Response) {
+  return vi.fn(async (url: string, init?: RequestInit) => {
+    void url;
+    void init;
+    return response();
+  });
+}
+
+describe("timestampFresh", () => {
+  it("accepts a timestamp within the window", () => {
+    expect(timestampFresh("2026-10-17T10:00:00Z", new Date("2026-10-17T10:02:30Z"))).toBe(true);
+  });
+
+  it("rejects a timestamp older than the window", () => {
+    expect(timestampFresh("2026-10-17T10:00:00Z", new Date("2026-10-17T10:02:31Z"))).toBe(false);
+  });
+
+  it("rejects a timestamp too far in the future", () => {
+    expect(timestampFresh("2026-10-17T10:00:00Z", new Date("2026-10-17T09:57:29Z"))).toBe(false);
+  });
+
+  it("rejects an unparseable timestamp", () => {
+    expect(timestampFresh("not-a-date", new Date("2026-10-17T10:00:00Z"))).toBe(false);
+  });
+});
 
 describe("verifyAlexaRequest", () => {
   it("accepts a valid SHA-256 signature", async () => {
@@ -125,5 +161,49 @@ describe("verifyAlexaRequest", () => {
       fetchCert
     });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("certificate fetching", () => {
+  it("refuses to follow a certificate redirect", async () => {
+    const fetchMock = stubFetch(() => new Response("", { status: 302, headers: { location: "https://evil.example/x.pem" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const r = await verifyAlexaRequest(fetched("https://s3.amazonaws.com/echo.api/redirect-test.pem"));
+      expect(r.ok).toBe(false);
+      expect(fetchMock.mock.calls[0]?.[1]?.redirect).toBe("error");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keys the cache without the query string or hash", async () => {
+    const fetchMock = stubFetch(() => new Response(PUBLIC_PEM, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const first = await verifyAlexaRequest(fetched("https://s3.amazonaws.com/echo.api/cache-normalize.pem?one=1"));
+      const second = await verifyAlexaRequest(fetched("https://s3.amazonaws.com/echo.api/cache-normalize.pem?two=2#fragment"));
+      expect(first).toEqual({ ok: true });
+      expect(second).toEqual({ ok: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("evicts the oldest certificate when the cache is full", async () => {
+    const fetchMock = stubFetch(() => new Response(PUBLIC_PEM, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const urls = Array.from({ length: 9 }, (_, i) => `https://s3.amazonaws.com/echo.api/cache-cap-${i}.pem`);
+      for (const certUrl of urls) {
+        expect(await verifyAlexaRequest(fetched(certUrl))).toEqual({ ok: true });
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(9);
+      expect(await verifyAlexaRequest(fetched(urls[0]!))).toEqual({ ok: true });
+      expect(fetchMock).toHaveBeenCalledTimes(10);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

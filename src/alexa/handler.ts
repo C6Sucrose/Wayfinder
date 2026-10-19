@@ -3,12 +3,14 @@ import { routeIntent, type AlexaIntentRequest } from "./intents.js";
 import { buildAlexaResponse } from "./response.js";
 import type { SessionStore } from "./sessions.js";
 import type { VerifyInput, VerifyResult } from "./types.js";
+import { timestampFresh } from "./verify.js";
 
 export interface AlexaDeps {
   verify: (input: VerifyInput) => Promise<VerifyResult>;
   agent: AgentService;
   sessions: SessionStore;
   verifyEnabled: boolean;
+  appId?: string;
 }
 
 export interface AlexaHttpResult {
@@ -20,7 +22,7 @@ const APOLOGY = "Sorry, I couldn't do that. Please try again.";
 
 type AlexaEnvelope = AlexaIntentRequest & {
   version?: string;
-  session?: { sessionId?: string };
+  session?: { sessionId?: string; application?: { applicationId?: string } };
   context?: { System?: { device?: { supportedInterfaces?: Record<string, unknown> } } };
 };
 
@@ -44,15 +46,26 @@ export function createAlexaHandler(deps: AlexaDeps) {
 
       const envelope = parsed as unknown as AlexaEnvelope;
 
+      const rawTimestamp = (envelope.request as { timestamp?: unknown }).timestamp;
+      if (typeof rawTimestamp !== "string") {
+        return { status: 400, body: { error: "invalid request" } };
+      }
+      if (!timestampFresh(rawTimestamp)) {
+        return { status: 401, body: { error: "unauthorized" } };
+      }
+
       if (deps.verifyEnabled) {
-        const timestamp = (envelope.request as { timestamp?: string }).timestamp ?? "";
         let verification: VerifyResult;
         try {
-          verification = await deps.verify({ rawBody, headers, timestamp });
+          verification = await deps.verify({ rawBody, headers, timestamp: rawTimestamp });
         } catch {
           return { status: 401, body: { error: "unauthorized" } };
         }
         if (!verification.ok) return { status: 401, body: { error: "unauthorized" } };
+      }
+
+      if (deps.appId !== undefined && envelope.session?.application?.applicationId !== deps.appId) {
+        return { status: 401, body: { error: "unauthorized" } };
       }
 
       const aplSupported = envelope.context?.System?.device?.supportedInterfaces?.["Alexa.Presentation.APL"] !== undefined;

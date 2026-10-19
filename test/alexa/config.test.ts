@@ -22,4 +22,13 @@ describe("resolveAlexaConfig", () => {
   it("ignores any other verification value", () => {
     expect(resolveAlexaConfig({ WAYFINDER_ALEXA_VERIFY: "nope" }).verifyEnabled).toBe(true);
   });
+
+  it("reads the allowed application id", () => {
+    expect(resolveAlexaConfig({ WAYFINDER_ALEXA_APP_ID: "amzn1.ask.skill.ok" }).appId).toBe("amzn1.ask.skill.ok");
+  });
+
+  it("leaves the application id unset when blank", () => {
+    expect(resolveAlexaConfig({ WAYFINDER_ALEXA_APP_ID: "  " }).appId).toBeUndefined();
+    expect(resolveAlexaConfig({}).appId).toBeUndefined();
+  });
 });

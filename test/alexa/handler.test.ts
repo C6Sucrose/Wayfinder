@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { createAlexaHandler } from "../../src/alexa/handler.js";
+import { createAgentService } from "../../src/agent/service.js";
 
-const body = (intent: string, sessionId = "s1") =>
+const body = (intent: string, sessionId = "s1", timestamp = new Date().toISOString(), applicationId?: string) =>
   Buffer.from(JSON.stringify({
     version: "1.0",
-    session: { sessionId },
-    request: { type: "IntentRequest", timestamp: "2026-10-17T10:00:00Z", intent: { name: intent } },
+    session: { sessionId, ...(applicationId !== undefined ? { application: { applicationId } } : {}) },
+    request: { type: "IntentRequest", timestamp, intent: { name: intent } },
     context: { System: { device: { supportedInterfaces: {} } } }
   }));
 
@@ -40,7 +41,7 @@ describe("alexa handler", () => {
 
   it("answers a launch request without calling the agent", async () => {
     const { calls, deps: d } = deps();
-    const result = await createAlexaHandler(d)(Buffer.from(JSON.stringify({ version: "1.0", session: { sessionId: "s" }, request: { type: "LaunchRequest", timestamp: "2026-10-17T10:00:00Z" } })));
+    const result = await createAlexaHandler(d)(Buffer.from(JSON.stringify({ version: "1.0", session: { sessionId: "s" }, request: { type: "LaunchRequest", timestamp: new Date().toISOString() } })));
     expect(calls).toEqual([]);
     expect(result.status).toBe(200);
   });
@@ -78,6 +79,54 @@ describe("alexa handler", () => {
     expect(calls).toEqual([]);
   });
 
+  it("rejects a stale timestamp even when verification is disabled", async () => {
+    let verified = 0;
+    const { calls, deps: d } = deps({
+      verifyEnabled: false,
+      verify: async () => { verified += 1; return { ok: true as const }; }
+    });
+    const timestamp = new Date(Date.now() - 10 * 60_000).toISOString();
+    const result = await createAlexaHandler(d)(body("BacklogIntent", "s1", timestamp));
+    expect(result.status).toBe(401);
+    expect(calls).toEqual([]);
+    expect(verified).toBe(0);
+  });
+
+  it("accepts a fresh timestamp when verification is disabled", async () => {
+    const { calls, deps: d } = deps({ verifyEnabled: false });
+    const result = await createAlexaHandler(d)(body("BacklogIntent"));
+    expect(result.status).toBe(200);
+    expect(calls).toEqual(["what do I need to deal with?"]);
+  });
+
+  it("rejects a non-string timestamp", async () => {
+    const { calls, deps: d } = deps();
+    const payload = JSON.parse(body("BacklogIntent").toString());
+    payload.request.timestamp = 12345;
+    const result = await createAlexaHandler(d)(Buffer.from(JSON.stringify(payload)));
+    expect(result.status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
+  it("accepts a matching application id", async () => {
+    const { deps: d } = deps({ appId: "amzn1.ask.skill.ok" });
+    const result = await createAlexaHandler(d)(body("BacklogIntent", "s1", new Date().toISOString(), "amzn1.ask.skill.ok"));
+    expect(result.status).toBe(200);
+  });
+
+  it("rejects a mismatched application id", async () => {
+    const { calls, deps: d } = deps({ appId: "amzn1.ask.skill.ok" });
+    const result = await createAlexaHandler(d)(body("BacklogIntent", "s1", new Date().toISOString(), "amzn1.ask.skill.other"));
+    expect(result.status).toBe(401);
+    expect(calls).toEqual([]);
+  });
+
+  it("accepts any application id when none is configured", async () => {
+    const { deps: d } = deps();
+    const result = await createAlexaHandler(d)(body("BacklogIntent", "s1", new Date().toISOString(), "amzn1.ask.skill.other"));
+    expect(result.status).toBe(200);
+  });
+
   it("speaks an apology when the agent fails", async () => {
     const { deps: d } = deps({
       agent: { brainName: "rules", async handle() { throw new Error("boom"); } }
@@ -109,5 +158,24 @@ describe("alexa handler", () => {
     payload.context.System.device.supportedInterfaces["Alexa.Presentation.APL"] = {};
     const result = await createAlexaHandler(d)(Buffer.from(JSON.stringify(payload)));
     expect(JSON.stringify(result.body)).toContain("Alexa.Presentation.APL.RenderDocument");
+  });
+
+  it("routes ProveIntent through the rules brain to verify_ledger", async () => {
+    const toolCalls: string[] = [];
+    const agent = createAgentService({
+      executor: {
+        async listTools() { return []; },
+        async callTool(name) {
+          toolCalls.push(name);
+          return { text: "The chain is intact; the record verifies.", isError: false };
+        },
+        async close() {}
+      }
+    });
+    const { deps: d } = deps({ agent });
+    const result = await createAlexaHandler(d)(body("ProveIntent"));
+    expect(toolCalls).toEqual(["verify_ledger"]);
+    expect(result.status).toBe(200);
+    expect(JSON.stringify(result.body)).toMatch(/chain|record/i);
   });
 });

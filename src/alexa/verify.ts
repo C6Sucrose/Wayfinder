@@ -7,8 +7,22 @@ export const CERT_SAN = "echo-api.amazon.com";
 export const MAX_CLOCK_SKEW_SECONDS = 150;
 const CERT_TIMEOUT_MS = 3000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_LIMIT = 8;
 
 const cache = new Map<string, { pem: string; fetchedAt: number }>();
+
+export function timestampFresh(timestamp: string, now: Date = new Date()): boolean {
+  const requested = Date.parse(timestamp);
+  if (!Number.isFinite(requested)) return false;
+  return Math.abs(now.getTime() - requested) <= MAX_CLOCK_SKEW_SECONDS * 1000;
+}
+
+function cacheKey(url: string): string {
+  const parsed = new URL(url);
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
 
 function validCertUrl(raw: string): boolean {
   let url: URL;
@@ -27,7 +41,7 @@ async function fetchPem(url: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CERT_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal, redirect: "error" });
     if (!response.ok) throw new Error(`cert ${response.status}`);
     return await response.text();
   } finally {
@@ -43,11 +57,16 @@ async function loadCert(url: string, fetchCert?: (url: string) => Promise<string
       return undefined;
     }
   }
-  const cached = cache.get(url);
+  const cached = cache.get(cacheKey(url));
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.pem;
   try {
     const pem = await fetchPem(url);
-    cache.set(url, { pem, fetchedAt: Date.now() });
+    const key = cacheKey(url);
+    if (!cache.has(key) && cache.size >= CACHE_LIMIT) {
+      const oldest = cache.keys().next();
+      if (!oldest.done) cache.delete(oldest.value);
+    }
+    cache.set(key, { pem, fetchedAt: Date.now() });
     return pem;
   } catch {
     return undefined;
@@ -112,11 +131,7 @@ export async function verifyAlexaRequest(input: VerifyInput): Promise<VerifyResu
 
   if (!signatureValid(pem, rawBody, headers.signature)) return { ok: false, reason: "signature mismatch" };
 
-  const requested = Date.parse(timestamp);
-  if (!Number.isFinite(requested)) return { ok: false, reason: "unparseable timestamp" };
-  if (Math.abs(now.getTime() - requested) > MAX_CLOCK_SKEW_SECONDS * 1000) {
-    return { ok: false, reason: "stale timestamp" };
-  }
+  if (!timestampFresh(timestamp, now)) return { ok: false, reason: "stale timestamp" };
 
   return { ok: true };
 }

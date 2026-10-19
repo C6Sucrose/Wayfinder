@@ -156,7 +156,8 @@ const deps: HttpDeps = {
           verify: verifyAlexaRequest,
           agent,
           sessions: createSessionStore(),
-          verifyEnabled: alexaConfig.verifyEnabled
+          verifyEnabled: alexaConfig.verifyEnabled,
+          ...(alexaConfig.appId !== undefined ? { appId: alexaConfig.appId } : {})
         }
       }
     : {})

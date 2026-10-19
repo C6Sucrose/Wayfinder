@@ -31,19 +31,36 @@ Before you upload the manifest, set `apis.custom.endpoint.uri` to your public HT
 | Variable | Default | Effect |
 |---|---|---|
 | `WAYFINDER_ALEXA` | `on` | `off` disables the endpoint entirely; no `/alexa` route is mounted. |
-| `WAYFINDER_ALEXA_VERIFY` | `on` | `off` disables ASK request-signature checks. **Local testing only.** |
+| `WAYFINDER_ALEXA_VERIFY` | `on` | `off` disables ASK request-signature checks. **Local testing only.** The timestamp freshness check still runs. |
+| `WAYFINDER_ALEXA_APP_ID` | unset | When set, requests whose `session.application.applicationId` does not match exactly are rejected with `401`. |
 
 **Never set `WAYFINDER_ALEXA_VERIFY=off` on a public endpoint.** With verification off, anyone who can reach the URL can drive the skill and the brain behind it. The bypass exists only so a developer can exercise the handler without Amazon's signed request.
 
+When `WAYFINDER_ALEXA_APP_ID` is unset, any application id is accepted. That is a deployment assumption: set it to your skill id in any shared environment.
+
 ## Local testing
 
-With the server running locally and the bypass enabled:
+The timestamp in [`sample-request.json`](sample-request.json) is a placeholder from the past. It is only a shape reference, not a fresh request, and the endpoint rejects it. Set the timestamp to the current time before posting. Start the server with the bypass:
 
 ```bash
 WAYFINDER_ALEXA_VERIFY=off npm start
+```
+
+Then post a request with a fresh timestamp. PowerShell:
+
+```powershell
+$body = Get-Content docs/alexa/sample-request.json -Raw | ConvertFrom-Json
+$body.request.timestamp = (Get-Date).ToUniversalTime().ToString("o")
+Invoke-WebRequest -Method Post -Uri http://127.0.0.1:8080/alexa `
+  -ContentType "application/json" -Body ($body | ConvertTo-Json -Depth 10)
+```
+
+bash:
+
+```bash
 curl -i http://127.0.0.1:8080/alexa \
   -H "Content-Type: application/json" \
-  --data-binary @docs/alexa/sample-request.json
+  --data-binary "$(sed "s/\"2026-10-17T10:00:00Z\"/\"$(date -u +%FT%TZ)\"/" docs/alexa/sample-request.json)"
 ```
 
 The sample sends a `BacklogIntent`. Without the bypass, the same request has no valid ASK headers, so the endpoint rejects it with `401 Unauthorized`. That rejection is the correct behavior: the signature check is what makes the endpoint safe to expose.

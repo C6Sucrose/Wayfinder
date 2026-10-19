@@ -17,6 +17,7 @@ export function createRuleBrain(deps: { executor: McpExecutor; demoImageRef?: st
     { pattern: /where (?:is|are) my (.+)/i, name: "find_object", input: (m) => ({ name: (m[1] ?? "").replace(/[?.!]/g, "").trim() }) },
     { pattern: /remember (?:my )?(.+?) (?:is|are) (?:on|in|at) (.+)/i, name: "remember_object",
       input: (m) => ({ name: (m[1] ?? "").trim(), locationNote: (m[2] ?? "").replace(/[.]/g, "").trim() }) },
+    { pattern: /\bprove\b|verify (?:my |the )?record|show (?:me )?(?:the )?record/i, name: "verify_ledger", input: () => ({}) },
     { pattern: /briefing|what.*(?:due|owe)|today/i, name: "daily_briefing", input: () => ({}) }
   ];
 
