@@ -1,0 +1,41 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "wayfinder",
+      "intents": [
+        { "name": "AMAZON.CancelIntent", "samples": ["cancel"] },
+        { "name": "AMAZON.HelpIntent", "samples": ["help", "what can you do"] },
+        { "name": "AMAZON.StopIntent", "samples": ["stop", "goodbye"] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "ReadMailIntent", "samples": ["read my mail", "check my post", "scan my letters"] },
+        { "name": "BacklogIntent", "samples": ["what do I need to deal with", "what needs attention", "what is outstanding"] },
+        { "name": "DueTodayIntent", "samples": ["what is due today", "what do I owe", "what is due"] },
+        { "name": "ProveIntent", "samples": ["prove it", "verify my record", "prove what you did"] },
+        {
+          "name": "WhereIsIntent",
+          "slots": [{ "name": "item", "type": "ITEM" }],
+          "samples": ["where are my {item}", "where is my {item}"]
+        },
+        {
+          "name": "RememberIntent",
+          "slots": [{ "name": "item", "type": "ITEM" }, { "name": "location", "type": "LOCATION" }],
+          "samples": ["remember my {item} is at {location}", "remember my {item} is in {location}"]
+        }
+      ],
+      "types": [
+        {
+          "name": "ITEM",
+          "values": [{ "name": { "value": "keys" } }, { "name": { "value": "wallet" } }, { "name": { "value": "glasses" } }]
+        },
+        {
+          "name": "LOCATION",
+          "values": [
+            { "name": { "value": "the kitchen counter" } },
+            { "name": { "value": "the entry table" } },
+            { "name": { "value": "the bedside table" } }
+          ]
+        }
+      ]
+    }
+  }
+}

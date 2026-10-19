@@ -77,6 +77,10 @@ This matters more than the feature list.
 - Accessible screens: backlog, audit history, verification, refusal.
 - Adapter ports (notifier, calendar, payment handoff) with null defaults and a conformance harness.
 
+**Alexa skill**
+
+A classic Alexa Skill host is implemented at `POST /alexa`, with ASK request-signature verification, intent routing into the existing brain, and SSML, Simple card, and APL responses. The manifest, interaction model, sample request, and setup guide are in [`docs/alexa/`](alexa/README.md). Unit tests cover verification and response shapes. Registering and certifying the skill in an Amazon developer account is the operator's step; it is not included here.
+
 **Implemented but currently blocked externally**
 
 - **Amazon Bedrock** inference: the code is complete, but this account's per-model daily token quota is `0` and the account is under verification. See [`docs/feedback/aws.md`](feedback/aws.md).
@@ -85,7 +89,6 @@ This matters more than the feature list.
 
 - Native Anthropic and Bedrock `ChatProvider` adapters; Anthropic is reachable via `openrouter`, Bedrock via its legacy path.
 - `WAYFINDER_VISION=provider` (multimodal provider reading).
-- A native Alexa Skill endpoint (`POST /alexa`) with request-signature verification, SSML, and APL. The MCP server, tools, and View are ready for a host; the skill bridge is the remaining layer.
 - Payment execution, medical or financial advice, and emergency response — excluded permanently by design, not by omission.
 
 ## The honest claim

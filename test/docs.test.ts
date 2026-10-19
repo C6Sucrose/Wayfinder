@@ -82,6 +82,27 @@ describe("public documentation", () => {
     expect(submission).not.toContain("bank-verified");
   });
 
+  it("ships the Alexa skill artifacts", () => {
+    for (const file of [
+      "docs/alexa/skill.json",
+      "docs/alexa/interaction-model.json",
+      "docs/alexa/README.md",
+      "docs/alexa/sample-request.json"
+    ]) {
+      expect(existsSync(file), file).toBe(true);
+    }
+    const manifest = JSON.parse(readFileSync("docs/alexa/skill.json", "utf8"));
+    expect(manifest.apis.custom.endpoint.uri).toContain("/alexa");
+    const model = JSON.parse(readFileSync("docs/alexa/interaction-model.json", "utf8"));
+    const names = model.interactionModel.languageModel.intents.map((i: { name: string }) => i.name);
+    for (const intent of ["ReadMailIntent", "BacklogIntent", "DueTodayIntent", "ProveIntent", "WhereIsIntent", "RememberIntent"]) {
+      expect(names).toContain(intent);
+    }
+    const readme = readFileSync("docs/alexa/README.md", "utf8");
+    expect(readme).toContain("WAYFINDER_ALEXA_VERIFY");
+    expect(readme.toLowerCase()).toContain("could not test against");
+  });
+
   it("leaks no account identifiers into the public docs", () => {
     const haystack = [
       read("README.md"),
