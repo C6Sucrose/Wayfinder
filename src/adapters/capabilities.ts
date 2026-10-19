@@ -8,6 +8,8 @@ export interface ProviderSummary {
   vision: { provider: string };
 }
 
+export type AlexaChannel = "skill" | "skill-dev" | "none";
+
 export interface Capabilities {
   adapters: {
     notifier: "webhook" | "null";
@@ -18,6 +20,7 @@ export interface Capabilities {
     assist: "null";
   };
   chain: { head: string; verified: boolean };
+  channels: { mcp: "http"; alexa: AlexaChannel };
   brain?: ProviderSummary["brain"];
   vision?: ProviderSummary["vision"];
 }
@@ -31,7 +34,14 @@ export function buildCapabilities(
 export function buildCapabilities(
   config: AdapterConfig,
   chain: { head: string; verified: boolean },
-  providers?: ProviderSummary
+  providers: ProviderSummary | undefined,
+  channels?: { alexa: AlexaChannel }
+): Capabilities;
+export function buildCapabilities(
+  config: AdapterConfig,
+  chain: { head: string; verified: boolean },
+  providers?: ProviderSummary,
+  channels?: { alexa: AlexaChannel }
 ): Capabilities {
   return {
     adapters: {
@@ -43,6 +53,7 @@ export function buildCapabilities(
       assist: config.assist.kind
     },
     chain,
+    channels: { mcp: "http", alexa: channels?.alexa ?? "none" },
     ...(providers !== undefined
       ? {
           brain: {

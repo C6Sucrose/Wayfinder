@@ -63,6 +63,12 @@ describe("capability disclosure", () => {
     expect(capabilities.vision.provider).toBe("textract");
     expect(JSON.stringify(capabilities)).not.toContain("apiKey");
   });
+
+  it("reports the Alexa channel", () => {
+    const config = resolveAdapterConfig({});
+    const capabilities = buildCapabilities(config, { head: "h", verified: true }, undefined, { alexa: "skill" });
+    expect(capabilities.channels).toEqual({ mcp: "http", alexa: "skill" });
+  });
 });
 
 describe("prepare_payment", () => {
