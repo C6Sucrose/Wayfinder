@@ -282,9 +282,12 @@ test/         Vitest suites
 
 ```bash
 npm test                    # full Vitest suite (builds the UI bundle first)
-npm run typecheck           # server and UI type checks
+npm run typecheck           # server, UI, and web client type checks
 npm run lint                # ESLint
 npm run adapters:conformance  # validate configured adapters
+npm run seed:demo           # predictable demo data with a verified ledger
+npm run demo:preflight      # check the demo data, backlog, and ledger before recording
+npm run demo:smoke          # end-to-end check: capabilities, agent, Alexa, freshness
 npm run format              # Prettier
 ```
 

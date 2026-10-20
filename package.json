@@ -19,6 +19,9 @@
     "lint": "eslint .",
     "adapters:conformance": "node scripts/adapters-conformance.mjs",
     "verify:bedrock": "node scripts/verify-bedrock.mjs",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "demo:preflight": "tsx scripts/preflight.ts",
+    "demo:smoke": "tsx scripts/smoke-demo.ts",
     "format": "prettier --write ."
   },
   "dependencies": {
