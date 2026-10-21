@@ -275,15 +275,16 @@
         <h1>Verifiable agency for the paperwork you can't glance at.</h1>
         <p class="lede">Wayfinder remembers every document a blind or low-vision person cannot glance at, correlates them into threads, tracks what is still owed and at risk, acts within limits the user sets, and can <strong>prove</strong> what it did.</p>
         <div class="badges">
-          <span class="chip chip--ok">Runs fully offline</span>
+          <span class="chip chip--ok">Offline core workflows</span>
           <span class="chip">Node 22+</span>
           <span class="chip">MIT licensed</span>
           <span class="chip">MCP Apps screens</span>
-          <span class="chip">386 tests</span>
+          <span class="chip">Vitest test suite</span>
         </div>
         <div class="cta">
           <a class="btn btn--primary" href="#quickstart">Quick start</a>
           <button class="btn" type="button" data-scroll="#record">How the proof works</button>
+          <a class="btn" href="video/Wayfinder-submission.mp4">Watch the 2:43 demo</a>
         </div>
       </div>
       <div class="card" aria-label="The three pillars">
@@ -320,6 +321,7 @@
         <div class="tabpanel" id="panel-run-1" role="tabpanel" aria-labelledby="tab-run-1">
           <pre><code>npm install
 npm run build      # bundle the MCP App view, then compile TypeScript
+npm run seed:demo  # optional: fictional sample data; resets the demo store
 npm start          # MCP server on http://127.0.0.1:8080</code></pre>
         </div>
         <div class="tabpanel" id="panel-run-2" role="tabpanel" aria-labelledby="tab-run-2" hidden>
@@ -702,7 +704,7 @@ npm run adapters:conformance</code></pre>
 
     <footer>
       <p><strong>Wayfinder</strong> — verifiable agency for the paperwork you can't glance at. MIT licensed. Built for the Amazon Hackathon.</p>
-      <p>This page is self-contained: no external scripts, styles, or fonts. <a href="../README.md">README</a> · <a href="demo-script.md">Demo script</a> · <a href="adapters/">Adapter recipes</a></p>
+      <p>This page is self-contained: no external scripts, styles, or fonts. <a href="../README.md">README</a> · <a href="video/Wayfinder-submission.mp4">Demo video</a> · <a href="adapters/">Adapter recipes</a></p>
     </footer>
   </main>
 </div>

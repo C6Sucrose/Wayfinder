@@ -51,6 +51,16 @@ describe("public documentation", () => {
 
   it("keeps internal design and development docs out of the repository", () => {
     expect(existsSync("docs/superpowers")).toBe(false);
+    for (const file of [
+      "docs/demo-script.md",
+      "docs/video/production-plan.md",
+      "docs/video/scenes.json",
+      "docs/video/narration.md",
+      "docs/video/youtube-upload.md"
+    ]) {
+      expect(existsSync(file), file).toBe(false);
+    }
+    expect(read(".gitignore")).toContain(".private/");
   });
 
   it("ships the submission artifacts", () => {
@@ -70,8 +80,8 @@ describe("public documentation", () => {
     expect(submission).toContain("Alexa+");
     expect(submission).toContain("AWS Builder");
     expect(submission).toContain("Open Source");
-    expect(submission).toContain("docs/feedback/");
-    expect(submission).toContain("docs/friction-log.md");
+    expect(submission).toContain("(feedback/README.md)");
+    expect(submission).toContain("(friction-log.md)");
   });
 
   it("states the honest limitations in the submission", () => {
@@ -127,7 +137,6 @@ describe("public documentation", () => {
     const haystack = [
       read("README.md"),
       read("docs/index.html"),
-      read("docs/demo-script.md"),
       read("docs/submission.md"),
       read("docs/friction-log.md"),
       read("docs/feedback/README.md"),

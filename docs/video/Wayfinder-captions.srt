@@ -1,0 +1,110 @@
+1
+00:00:00,350 --> 00:00:06,614
+A letter is more than words on a page. It can be a bill, a deadline, or a
+changed appointment.
+
+2
+00:00:06,964 --> 00:00:11,332
+For blind and low vision people, reading it aloud is only the beginning.
+
+3
+00:00:11,682 --> 00:00:17,514
+Wayfinder helps manage what comes next, within limits you choose, with a
+record you can inspect.
+
+4
+00:00:19,214 --> 00:00:27,278
+This is the live MCP demo host, running offline with fictional sample
+documents. Image reading is off for this recording.
+
+5
+00:00:27,628 --> 00:00:35,524
+I ask, what's due today? The briefing highlights a water bill, an appointment,
+a flagged letter, and an everyday reminder.
+
+6
+00:00:37,224 --> 00:00:42,000
+The backlog connects related letters into threads and ranks what needs
+attention.
+
+7
+00:00:42,350 --> 00:00:47,630
+Three water bill reminders are one outstanding demand, with its deadline and
+history.
+
+8
+00:00:47,980 --> 00:00:53,908
+A corrected appointment belongs with the original letter, so outdated
+information does not stand alone.
+
+9
+00:00:55,608 --> 00:01:00,504
+Here, the sample insurance letter has low confidence and needs recapturing.
+
+10
+00:01:00,854 --> 00:01:05,702
+Wayfinder makes uncertainty visible, instead of guessing at a blurred account
+number.
+
+11
+00:01:07,402 --> 00:01:12,634
+Now I try to discard a document. The user has forbidden that action.
+
+12
+00:01:12,984 --> 00:01:19,896
+Even after confirmation, the authority check refuses it, explains why, and
+offers help from a trusted contact.
+
+13
+00:01:20,246 --> 00:01:23,678
+The document stays, and the refusal is recorded.
+
+14
+00:01:25,378 --> 00:01:32,698
+I ask, prove it. Wayfinder recomputes the ledger's hash chain, including the
+refusal we just made.
+
+15
+00:01:33,048 --> 00:01:37,536
+The chain verifies, and its final fingerprint is available to copy.
+
+16
+00:01:37,886 --> 00:01:42,950
+This is a tamper evident system record, not independent confirmation from a
+bank.
+
+17
+00:01:44,650 --> 00:01:49,810
+The same interface helps with everyday information. Where are my keys?
+
+18
+00:01:50,160 --> 00:01:55,200
+Wayfinder recalls the kitchen counter, the location the user previously
+recorded.
+
+19
+00:01:56,900 --> 00:02:01,436
+The host offers a dark theme, larger text, and motion controls.
+
+20
+00:02:01,786 --> 00:02:09,634
+Keyboard focus stays visible. Results are available as text and speech, so
+important information is not screen only.
+
+21
+00:02:11,334 --> 00:02:19,758
+Behind the interface is a self hosted MCP server, built with TypeScript and
+Node.js, with interactive MCP App views.
+
+22
+00:02:20,108 --> 00:02:28,628
+Amazon Textract can read new documents when configured. Hosted models and an
+implemented Alexa Skill endpoint extend the same core.
+
+23
+00:02:30,328 --> 00:02:35,536
+Wayfinder turns paperwork into something you can manage, question, and verify.
+
+24
+00:02:35,886 --> 00:02:41,766
+Greater independence. Clear boundaries. A record you can inspect.

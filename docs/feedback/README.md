@@ -1,6 +1,6 @@
 # Product feedback
 
-This is the feedback we owe the hackathon: what we used, what worked, and what made the work harder. It is written from the actual build, not from documentation. Every entry names the specific behaviour we hit and a concrete suggestion.
+Developer feedback from building Wayfinder: the tools and services used, what worked, and where integration was difficult. Each entry describes an observed behaviour and a concrete improvement suggestion.
 
 ## Method
 

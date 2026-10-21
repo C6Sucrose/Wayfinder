@@ -4,19 +4,28 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](package.json)
-[![Tests](https://img.shields.io/badge/tests-386%20passing-success.svg)](#development)
+[![Tests](https://img.shields.io/badge/tests-Vitest-success.svg)](#development)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6.svg)](tsconfig.json)
 [![MCP](https://img.shields.io/badge/MCP-server-6b4fbb.svg)](https://modelcontextprotocol.io)
 
 Wayfinder is a voice-first **MCP server** that remembers the documents a blind or low-vision person cannot glance at, correlates them into threads, tracks what is still owed and at risk, acts only within limits the user sets, and keeps a tamper-evident record it can use to **prove what it did**.
 
-It renders interactive **MCP App** screens into any MCP Apps host (the bundled client simulates an Alexa+ style device), and it runs fully offline: with no cloud credentials it still works, using a deterministic rule-based brain.
+It renders interactive **MCP App** screens into an MCP Apps host. The bundled web client demonstrates an Alexa+-style voice-and-screen experience. The core workflows run offline with a deterministic rule-based brain; reading new images requires a configured vision service.
+
+**Submitted to Build, Ship, Shape: Amazon Developer Hackathon — Alexa+ track.**
+
+[![Wayfinder demonstration: voice-first paperwork assistance, user-defined boundaries, and a verifiable record](docs/video/Wayfinder-thumbnail.png)](docs/video/Wayfinder-submission.mp4)
+
+**[Watch or download the 2:43 demo](docs/video/Wayfinder-submission.mp4)** · **[Screenshots](docs/gallery/README.md)** · **[Judge walkthrough](#judge-walkthrough)** · **[Submission details](docs/submission.md)**
+
+The video shows the running MCP host with fictional sample documents, offline rules, and vision off. English narration and captions are included.
 
 <!-- TOC -->
 - [Why](#why)
 - [What it does](#what-it-does)
 - [Who it is for](#who-it-is-for)
 - [Quick start](#quick-start)
+- [Judge walkthrough](#judge-walkthrough)
 - [Choosing a model](#choosing-a-model)
 - [Using it](#using-it)
 - [MCP surface](#mcp-surface)
@@ -66,7 +75,9 @@ Perception (reading a letter, a bill, a label) is an *input*. The product is the
 **Prerequisites:** Node.js 22 or newer. No AWS account is required to run.
 
 ```bash
-npm install
+git clone https://github.com/C6Sucrose/Wayfinder.git
+cd Wayfinder
+npm ci
 npm run build      # bundles the MCP App view, then compiles TypeScript
 npm start          # MCP server on http://127.0.0.1:8080
 ```
@@ -82,10 +93,34 @@ Try these utterances in the client:
 - "Read my mail."
 - "What's due today?"
 - "Where are my keys?" (say "Remember my keys are on the kitchen counter." first)
-- "What do I need to deal with?"
+- Open **Backlog** for related documents ranked by urgency. In the offline rule mode, unmatched requests such as "What do I need to deal with?" return the daily briefing.
 - "Prove it." — runs `verify_ledger` and reports the terminal hash
 
-A full three-minute walkthrough, including the offline fallback narration, is in [`docs/demo-script.md`](docs/demo-script.md).
+The [2:43 demonstration](docs/video/README.md) shows the offline workflow with fictional sample documents.
+
+## Judge walkthrough
+
+No login, API key, AWS account, or Alexa hardware is needed for the offline demo. Use a fresh checkout and seed the fictional documents **before starting the server**:
+
+```bash
+npm run seed:demo
+npm run demo:preflight
+npm start
+```
+
+The seed command resets the selected data directory; use it for sample data, not an existing personal inbox. `WARN server not reachable` during preflight is expected before `npm start`.
+
+Run `npm run dev:web` in a second terminal and open **http://127.0.0.1:5173**:
+
+1. Ask **"What's due today?"** for a briefing.
+2. Open **Backlog** and expand the City Water thread: three reminders, one demand.
+3. Open **Documents** and inspect the low-confidence insurance letter.
+4. Choose **discard** on the Pizza Corner document and confirm. The authority envelope refuses the forbidden action and offers trusted-contact help.
+5. Ask **"Prove it"** to verify the ledger, including the refusal.
+6. Ask **"Where are my keys?"** to retrieve the seeded kitchen-counter location.
+7. Try **Larger text**, the dark host theme, **Motion** off, and keyboard navigation.
+
+`npm run demo:smoke` checks the local server, agent, ledger response, object memory, and Alexa response shapes. **"Read my mail" requires vision configuration**; the offline demo reports that the reader is unavailable rather than simulating extraction.
 
 ### Configuration
 
@@ -104,7 +139,7 @@ By default, with no chat provider and no `BEDROCK_MODEL_ID` configured, the serv
 
 Bring your own model. One port, many providers; `rules` is the default and needs no key.
 
-Three wire protocols sit behind the chat port — `openai-compatible`, `anthropic-messages`, and `bedrock-converse`. A `rules` run starts with no warnings.
+The provider presets describe three wire protocols: `openai-compatible`, `anthropic-messages`, and `bedrock-converse`. This release wires the OpenAI-compatible chat adapter and a separate legacy Bedrock path; native Anthropic and Bedrock chat adapters are not implemented. A `rules` run needs no key.
 
 | Provider id | Protocol | Default model | Key env | Images |
 |---|---|---|---|---|
@@ -161,7 +196,7 @@ AWS_REGION=us-east-1
 
 ### Egress
 
-Choosing a hosted provider sends utterances to that provider. `rules`, `textract`, and `bedrock` stay within your AWS account and the configured `AWS_REGION`; `rules` itself makes no network calls.
+Choosing a hosted provider sends utterances to that provider. Textract and Bedrock use your configured AWS account and `AWS_REGION`. The rule brain makes no model-provider network calls; the core stores records locally.
 
 ## Using it
 
@@ -297,7 +332,7 @@ The domain rules, the checksum and hash-chain logic, and the adapter contracts a
 
 - **[Interactive documentation](docs/index.html)** — the guide as a self-contained, searchable page (open it locally, or serve it from GitHub Pages).
 - **[Adapter recipes](docs/adapters/)** — how to enable and configure each optional port.
-- **[Demo script](docs/demo-script.md)** — the three-minute walkthrough, with offline fallback narration and a video runbook.
+- **[Demo video](docs/video/README.md)** — the recorded walkthrough with English captions.
 
 ## Alexa skill
 
@@ -305,7 +340,9 @@ A classic Alexa Skill host is mounted at `POST /alexa` on the same server, prote
 
 ## Submission artifacts
 
-- **[Submission summary](docs/submission.md)** — track declaration, artifact checklist, what is real and what is not.
+- **[Submission overview](docs/submission.md)** — track, integrations, evaluation links, and implementation status.
+- **[Demo video](docs/video/README.md)** — 2:43 walkthrough, English captions, narration, and thumbnail.
+- **[Gallery](docs/gallery/README.md)** — screenshots of the real host, document threads, confidence labels, refusal, and verification.
 - **[Product feedback](docs/feedback/)** — what we learned building on Bedrock, Textract, the MCP SDK, MCP Apps, the web platform, and our tooling.
 - **[Friction log](docs/friction-log.md)** — what slowed the build, with resolutions and costs.
 
